@@ -12,27 +12,34 @@ builds:
     binary: gokub
     env:
       - CGO_ENABLED=0
+
     goos:
       - darwin
       - linux
+
     goarch:
       - amd64
       - arm64
+
     ldflags:
-      - -s -w
-      - -X github.com/gokub/gokub.Version={{ .Version }}
-      - -X github.com/gokub/gokub.Repository={{ .Env.GITHUB_REPOSITORY }}
+      - >-
+        -s -w
+        -X github.com/ongyoo/gokub.Version={{ .Version }}
+        -X github.com/ongyoo/gokub.Repository={{ .Env.GITHUB_REPOSITORY }}
 
 archives:
   - id: release
     ids:
       - gokub
+
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}Darwin{{ else }}Linux{{ end }}_
       {{- if eq .Arch "amd64" }}x86_64{{ else }}arm64{{ end }}
+
     formats:
       - tar.gz
+
     files:
       - LICENSE
       - README.md
