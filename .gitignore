@@ -1,0 +1,7 @@
+dist/
+*.log
+.env
+.DS_Store
+.gocache/
+example-project/
+vscode-extension/node_modules/

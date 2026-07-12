@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add GOKUB Domain"
+  short_description: "Add a tested domain to a GOKUB service"
+  default_prompt: "Use $gokub-add-domain to add this domain capability to the current GOKUB project."

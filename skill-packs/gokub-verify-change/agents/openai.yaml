@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify GOKUB Change"
+  short_description: "Review and verify a GOKUB project change"
+  default_prompt: "Use $gokub-verify-change to review and verify the current change before delivery."

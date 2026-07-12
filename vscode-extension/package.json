@@ -1,0 +1,48 @@
+{
+  "name": "gokub",
+  "displayName": "GOKUB",
+  "description": "Create and manage production-ready Go services with GOKUB.",
+  "version": "0.1.0",
+  "publisher": "roomkub",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gokub/gokub.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Programming Languages", "Other"],
+  "keywords": ["go", "golang", "scaffold", "mcp", "codex", "claude"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "gokub.newProject", "title": "GOKUB: New Project" },
+      { "command": "gokub.addTemplate", "title": "GOKUB: Add Custom Template" },
+      { "command": "gokub.listTemplates", "title": "GOKUB: List Custom Templates" },
+      { "command": "gokub.addFeature", "title": "GOKUB: Add Feature" },
+      { "command": "gokub.status", "title": "GOKUB: Project Status" },
+      { "command": "gokub.doctor", "title": "GOKUB: Run Doctor" },
+      { "command": "gokub.openMCPConfig", "title": "GOKUB: Open MCP Configuration" },
+      { "command": "gokub.installSkills", "title": "GOKUB: Install Agent Skills" },
+      { "command": "gokub.uninstall", "title": "GOKUB: Uninstall CLI" }
+    ],
+    "configuration": {
+      "title": "GOKUB",
+      "properties": {
+        "gokub.executablePath": {
+          "type": "string",
+          "default": "gokub",
+          "description": "Path to the GOKUB CLI executable."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "npx @vscode/vsce package --out ../dist/gokub-vscode.vsix"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.0"
+  }
+}

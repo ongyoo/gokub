@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="GOKUB CLI: Help" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="gokub" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="help" />
+    <kind value="PACKAGE" />
+    <package value="github.com/gokub/gokub/cmd/gokub" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <method v="2" />
+  </configuration>
+</component>

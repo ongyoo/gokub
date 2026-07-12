@@ -209,6 +209,18 @@ Every generated project includes:
 - `CLAUDE.md` for Claude Code project guidance.
 - `.codex/config.toml` for Codex project MCP configuration.
 - `.mcp.json` for Claude and MCP-compatible clients.
+- Portable project skills for Codex, Claude, Copilot, Gemini, and other compatible agents.
+
+Install or refresh the complete skill pack in any project:
+
+```bash
+gokub skill install
+gokub skill list
+```
+
+The pack includes `gokub-project`, `gokub-add-domain`, and
+`gokub-verify-change`. See [`docs/agent-skills.md`](docs/agent-skills.md) for agent
+paths, targeted installation, updates, and removal.
 
 The stdio server starts with:
 
@@ -261,6 +273,7 @@ make extension
 - Template decisions: [`docs/template-architecture.md`](docs/template-architecture.md)
 - Reference audit: [`docs/reference-audit.md`](docs/reference-audit.md)
 - Custom-template guide: [`docs/custom-templates.md`](docs/custom-templates.md)
+- Agent-skills guide: [`docs/agent-skills.md`](docs/agent-skills.md)
 - Homebrew setup: [`packaging/homebrew/README.md`](packaging/homebrew/README.md)
 
 ---
