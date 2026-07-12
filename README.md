@@ -33,7 +33,7 @@ not copied into generated projects.
 
 ## Install
 
-The final repository URL is not selected yet. Replace `<owner>/<repo>` when publishing.
+The final repository URL is not selected yet. Replace `ongyoo/gokub` when publishing.
 
 ### Homebrew
 
@@ -44,7 +44,7 @@ brew install <owner>/tap/gokub
 ### One-line installer
 
 ```bash
-GOKUB_REPOSITORY=<owner>/<repo> /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh)"
+GOKUB_REPOSITORY=<owner>/<repo> /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ongyoo/gokub/main/install.sh)"
 ```
 
 The installer supports macOS and Linux on Intel and ARM. It verifies the release
