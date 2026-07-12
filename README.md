@@ -38,13 +38,13 @@ The final repository URL is not selected yet. Replace `ongyoo/gokub` when publis
 ### Homebrew
 
 ```bash
-brew install <owner>/tap/gokub
+brew install ongyoo/tap/gokub
 ```
 
 ### One-line installer
 
 ```bash
-GOKUB_REPOSITORY=<owner>/<repo> /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ongyoo/gokub/main/install.sh)"
+GOKUB_REPOSITORY=ongyoo/gokub /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ongyoo/gokub/main/install.sh)"
 ```
 
 The installer supports macOS and Linux on Intel and ARM. It verifies the release
@@ -53,7 +53,7 @@ SHA-256 before installing into `/usr/local/bin` or `~/.local/bin` without `sudo`
 ### Go install
 
 ```bash
-go install github.com/<owner>/<repo>/cmd/gokub@latest
+go install github.com/ongyoo/gokub/cmd/gokub@latest
 ```
 
 For local development, run `make install`.
