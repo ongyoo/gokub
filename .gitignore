@@ -4,4 +4,5 @@ dist/
 .DS_Store
 .gocache/
 example-project/
+spec.md
 vscode-extension/node_modules/

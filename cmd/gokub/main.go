@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gokub/gokub/internal/cli"
+	"github.com/ongyoo/gokub/internal/cli"
 )
 
 func main() {

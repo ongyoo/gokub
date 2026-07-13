@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gokub/gokub/internal/generator"
-	"github.com/gokub/gokub/internal/manifest"
-	"github.com/gokub/gokub/internal/templates"
+	"github.com/ongyoo/gokub/internal/generator"
+	"github.com/ongyoo/gokub/internal/manifest"
+	"github.com/ongyoo/gokub/internal/templates"
 )
 
 func TestAddAndGenerate(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("GOKUB_HOME", home)
 	source := filepath.Join(t.TempDir(), "team-api")
-	mustWrite(t, filepath.Join(source, "go.mod"), "module {{module}}\n\ngo 1.24\n")
+	mustWrite(t, filepath.Join(source, "go.mod"), "module {{module}}\n\ngo {{go_version}}\n")
 	mustWrite(t, filepath.Join(source, "cmd", "{{project_name}}", "main.go"), "package main\n")
 	mustWrite(t, filepath.Join(source, "README.md"), "# {{project_name}}\n\nFramework: {{framework}}\n")
 	mustWrite(t, filepath.Join(source, ".env"), "SECRET=do-not-copy\n")
@@ -45,7 +45,7 @@ func TestAddAndGenerate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), "module github.com/example/orders-api") {
+	if !strings.Contains(string(content), "module github.com/example/orders-api") || !strings.Contains(string(content), "go 1.26") {
 		t.Fatalf("placeholder was not rendered: %s", content)
 	}
 	if _, err := os.Stat(filepath.Join(project, "cmd", "orders-api", "main.go")); err != nil {

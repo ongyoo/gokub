@@ -8,12 +8,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gokub/gokub/internal/manifest"
+	"github.com/ongyoo/gokub/internal/manifest"
 )
 
 var excluded = map[string]bool{
 	".git": true, ".gocache": true, ".idea": true, "node_modules": true,
 	"dist": true, "tmp": true, ".env": true, ".DS_Store": true,
+	".gokub-template.json": true,
 }
 
 func Add(name, source string) (string, error) {
@@ -114,6 +115,7 @@ func Generate(source, root string, m manifest.Manifest) error {
 	replacements := map[string]string{
 		"{{project_name}}": m.Name,
 		"{{module}}":       m.Module,
+		"{{go_version}}":   m.GoVersion,
 		"{{template}}":     m.Template,
 		"{{style}}":        m.Style,
 		"{{framework}}":    m.Framework,
@@ -136,7 +138,8 @@ func copyTree(source, destination string, replacements map[string]string) error 
 		if path == source {
 			return os.MkdirAll(destination, 0o755)
 		}
-		if excluded[entry.Name()] {
+		excludeEnv := strings.HasPrefix(entry.Name(), ".env") && entry.Name() != ".env.example"
+		if excluded[entry.Name()] || excludeEnv {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}

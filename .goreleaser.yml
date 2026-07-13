@@ -2,10 +2,6 @@ version: 2
 
 project_name: gokub
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: gokub
     main: ./cmd/gokub
@@ -26,6 +22,8 @@ builds:
         -s -w
         -X github.com/ongyoo/gokub.Version={{ .Version }}
         -X github.com/ongyoo/gokub.Repository={{ .Env.GITHUB_REPOSITORY }}
+        -X github.com/ongyoo/gokub.Commit={{ .Commit }}
+        -X github.com/ongyoo/gokub.BuildDate={{ .Date }}
 
 archives:
   - id: release

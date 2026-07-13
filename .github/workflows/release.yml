@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,6 +21,44 @@ jobs:
         with:
           go-version: "1.25.x"
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || {
+            echo "release tag must be SemVer with a v prefix: $RELEASE_TAG" >&2
+            exit 1
+          }
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Check module files
+        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+      - name: Test
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test Linux arrow-key wizard
+        run: ./scripts/test-linux-wizard.sh
+      - name: Test installer security
+        run: ./scripts/test-installer.sh
+      - name: Test release packaging
+        run: ./scripts/test-packaging.sh
+      - name: Package VS Code extension
+        working-directory: vscode-extension
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm test
+          npm version "${RELEASE_VERSION#v}" --no-git-tag-version
+          mkdir -p ../dist
+          npm run package
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -26,3 +66,37 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify release artifacts
+        run: ./scripts/verify-release-artifacts.sh "${{ github.ref_name }}" dist
+      - name: Render Homebrew formula
+        run: ./scripts/render-homebrew-formula.sh "${{ github.ref_name }}" dist/checksums.txt dist/gokub.rb
+      - name: Attach Homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" dist/gokub.rb --clobber
+      - name: Attach VS Code extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" dist/gokub-vscode.vsix --clobber
+      - name: Check out Homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ongyoo/homebrew-tap
+          token: ${{ env.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+      - name: Publish Homebrew formula
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cp dist/gokub.rb homebrew-tap/Formula/gokub.rb
+          cd homebrew-tap
+          if test -z "$(git status --porcelain -- Formula/gokub.rb)"; then
+            echo "Homebrew formula is already current."
+            exit 0
+          fi
+          git config user.name "gokub-release-bot"
+          git config user.email "roomkub.thailand@gmail.com"
+          git add Formula/gokub.rb
+          git commit -m "gokub ${{ github.ref_name }}"
+          git push

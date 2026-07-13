@@ -15,6 +15,13 @@ fail() {
 command -v curl >/dev/null 2>&1 || fail "curl is required"
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 
+[[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
+  fail "repository must use owner/name format"
+if [[ "$VERSION" != "latest" ]]; then
+  [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] ||
+    fail "version must be a v-prefixed SemVer tag"
+fi
+
 case "$(uname -s)" in
   Darwin) OS="Darwin" ;;
   Linux)  OS="Linux" ;;
@@ -29,7 +36,7 @@ esac
 
 if [[ "$VERSION" == "latest" ]]; then
   VERSION="$(
-    curl -fsSL \
+    curl -fsSL --proto '=https' --proto-redir '=https' \
       -H "Accept: application/vnd.github+json" \
       "https://api.github.com/repos/${REPOSITORY}/releases/latest" |
       sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' |
@@ -39,6 +46,9 @@ if [[ "$VERSION" == "latest" ]]; then
   [[ -n "$VERSION" ]] ||
     fail "could not determine latest release for ${REPOSITORY}"
 fi
+
+[[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] ||
+  fail "release API returned an invalid version tag"
 
 RELEASE_VERSION="${VERSION#v}"
 ARCHIVE="${PROJECT}_${RELEASE_VERSION}_${OS}_${ARCH}.tar.gz"
@@ -50,12 +60,12 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 echo "Installing GOKUB ${VERSION} from ${REPOSITORY}"
 echo "Downloading ${ARCHIVE}..."
 
-curl -fL \
+curl -fL --proto '=https' --proto-redir '=https' \
   "${BASE_URL}/${ARCHIVE}" \
   -o "${TEMP_DIR}/${ARCHIVE}" ||
   fail "release asset not found: ${ARCHIVE}"
 
-curl -fL \
+curl -fL --proto '=https' --proto-redir '=https' \
   "${BASE_URL}/checksums.txt" \
   -o "${TEMP_DIR}/checksums.txt" ||
   fail "checksums.txt was not found"
@@ -65,8 +75,8 @@ EXPECTED="$(
     "${TEMP_DIR}/checksums.txt"
 )"
 
-[[ -n "$EXPECTED" ]] ||
-  fail "checksum for ${ARCHIVE} was not found"
+[[ "$EXPECTED" =~ ^[0-9a-fA-F]{64}$ ]] ||
+  fail "checksum for ${ARCHIVE} is missing or invalid"
 
 if command -v sha256sum >/dev/null 2>&1; then
   ACTUAL="$(
@@ -83,10 +93,10 @@ fi
 [[ "$ACTUAL" == "$EXPECTED" ]] ||
   fail "checksum verification failed"
 
-tar -xzf "${TEMP_DIR}/${ARCHIVE}" -C "$TEMP_DIR"
+tar -xzf "${TEMP_DIR}/${ARCHIVE}" -C "$TEMP_DIR" -- "$PROJECT"
 
-[[ -x "${TEMP_DIR}/${PROJECT}" ]] ||
-  fail "archive does not contain the gokub executable"
+[[ -f "${TEMP_DIR}/${PROJECT}" && ! -L "${TEMP_DIR}/${PROJECT}" && -x "${TEMP_DIR}/${PROJECT}" ]] ||
+  fail "archive does not contain a regular gokub executable"
 
 if [[ -z "$INSTALL_DIR" ]]; then
   if [[ -d /usr/local/bin && -w /usr/local/bin ]]; then

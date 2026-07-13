@@ -30,6 +30,9 @@ scaling, reliability, or release cadence requires an independent process.
 5. Wire dependencies only in the relevant `cmd` composition root.
 6. Test the service with a small repository stub and test transport behavior separately.
 
+Use `gokub graph` before and after moving code across architecture boundaries. Use
+`gokub graph --format mermaid` when a review needs a portable diagram.
+
 ## Events
 
 - Use the typed envelope in `pkg/contracts`.

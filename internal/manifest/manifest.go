@@ -7,24 +7,33 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/ongyoo/gokub/internal/goversion"
 )
 
-const FileName = ".gokub.yaml"
+const (
+	FileName             = ".gokub.yaml"
+	CurrentSchemaVersion = 2
+)
 
 var projectNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 type Manifest struct {
-	Name         string
-	Module       string
-	Template     string
-	Style        string
-	Framework    string
-	Database     string
-	Architecture string
-	Messaging    string
-	Recipes      []string
-	Features     []string
+	SchemaVersion    int
+	GeneratorVersion string
+	Name             string
+	Module           string
+	GoVersion        string
+	Template         string
+	Style            string
+	Framework        string
+	Database         string
+	Architecture     string
+	Messaging        string
+	Recipes          []string
+	Features         []string
 }
 
 func New(name, module string) Manifest {
@@ -32,25 +41,40 @@ func New(name, module string) Manifest {
 		module = name
 	}
 	return Manifest{
-		Name:         name,
-		Module:       module,
-		Template:     "gin-clean",
-		Style:        "monolith",
-		Framework:    "gin",
-		Database:     "postgres",
-		Architecture: "clean",
-		Messaging:    "none",
-		Features:     []string{"docker", "github-actions"},
-		Recipes:      []string{},
+		SchemaVersion: CurrentSchemaVersion,
+		Name:          name,
+		Module:        module,
+		GoVersion:     goversion.Recommended,
+		Template:      "gin-clean",
+		Style:         "monolith",
+		Framework:     "gin",
+		Database:      "postgres",
+		Architecture:  "clean",
+		Messaging:     "none",
+		Features:      []string{"docker", "github-actions"},
+		Recipes:       []string{},
 	}
 }
 
 func Validate(m Manifest) error {
+	if m.SchemaVersion < 0 || m.SchemaVersion > CurrentSchemaVersion {
+		return fmt.Errorf("unsupported manifest schema version %d (CLI supports up to %d)", m.SchemaVersion, CurrentSchemaVersion)
+	}
+	if strings.ContainsAny(m.GeneratorVersion, "\r\n:") {
+		return fmt.Errorf("invalid generator version %q", m.GeneratorVersion)
+	}
 	if !projectNamePattern.MatchString(m.Name) || m.Name == "." || m.Name == ".." {
 		return fmt.Errorf("project name %q must contain only letters, numbers, hyphens, or underscores", m.Name)
 	}
 	if strings.TrimSpace(m.Module) == "" || strings.ContainsAny(m.Module, " \t\r\n") {
 		return fmt.Errorf("module %q must be a non-empty Go module path without spaces", m.Module)
+	}
+	if m.GoVersion == "" {
+		if m.SchemaVersion >= 2 {
+			return fmt.Errorf("go_version is required for manifest schema %d", m.SchemaVersion)
+		}
+	} else if err := goversion.Validate(m.GoVersion); err != nil {
+		return err
 	}
 	for field, value := range map[string]string{
 		"template": m.Template, "style": m.Style, "framework": m.Framework, "database": m.Database,
@@ -100,10 +124,18 @@ func Read(path string) (Manifest, error) {
 		key := strings.TrimSpace(parts[0])
 		value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
 		switch key {
+		case "schema_version":
+			if parsed, err := strconv.Atoi(value); err == nil {
+				m.SchemaVersion = parsed
+			}
+		case "generator_version":
+			m.GeneratorVersion = value
 		case "name":
 			m.Name = value
 		case "module":
 			m.Module = value
+		case "go_version":
+			m.GoVersion = value
 		case "template":
 			m.Template = value
 		case "style":
@@ -131,9 +163,18 @@ func Write(path string, m Manifest) error {
 	m.Features = uniqueSorted(m.Features)
 	m.Recipes = uniqueSorted(m.Recipes)
 	content := &strings.Builder{}
+	if m.SchemaVersion > 0 {
+		fmt.Fprintf(content, "schema_version: %d\n", m.SchemaVersion)
+	}
+	if m.GeneratorVersion != "" {
+		fmt.Fprintf(content, "generator_version: %s\n", m.GeneratorVersion)
+	}
 	fmt.Fprintln(content, "project:")
 	fmt.Fprintf(content, "  name: %s\n", m.Name)
 	fmt.Fprintf(content, "  module: %s\n", m.Module)
+	if m.GoVersion != "" {
+		fmt.Fprintf(content, "  go_version: %s\n", m.GoVersion)
+	}
 	fmt.Fprintf(content, "  template: %s\n", m.Template)
 	fmt.Fprintf(content, "  style: %s\n", m.Style)
 	fmt.Fprintf(content, "  framework: %s\n", m.Framework)

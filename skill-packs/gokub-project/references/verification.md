@@ -14,6 +14,7 @@ go test -race ./...
 go vet ./...
 go build ./...
 gokub doctor
+gokub score
 ```
 
 Use project-native Make targets when available:
@@ -24,6 +25,7 @@ make test
 make vet
 make build
 make doctor
+make score
 ```
 
 For HTTP changes, verify `/health/live` and `/health/ready` still return success and

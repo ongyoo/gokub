@@ -14,7 +14,9 @@ database code.
 2. Use `gokub add crud <name>` when its scaffold matches the request; otherwise
    create the package within the established domain location.
 3. Define domain models and repository interfaces without HTTP, SQL, queue, or SDK
-   types in their signatures.
+   types in their signatures. When representative JSON or JSON Schema exists, use
+   `gokub add model <name> --from <file.json>` as a typed starting point and review
+   its optional fields before adding behavior.
 4. Implement service behavior with constructor-injected interfaces and propagated
    `context.Context`.
 5. Validate inputs at the service or transport boundary and wrap errors with the

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gokub/gokub/internal/manifest"
+	"github.com/ongyoo/gokub/internal/manifest"
 )
 
 func TestStandardProjectStyles(t *testing.T) {
@@ -55,6 +55,37 @@ func TestStandardProjectStyles(t *testing.T) {
 			}
 			if !strings.Contains(string(content), "github.com/twmb/franz-go v1.21.5") {
 				t.Fatal("core dependencies are missing")
+			}
+			if !strings.Contains(string(content), "go "+m.GoVersion+"\n") {
+				t.Fatalf("go.mod does not use selected Go version:\n%s", content)
+			}
+			dockerfile, err := os.ReadFile(filepath.Join(project, "Dockerfile"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(dockerfile), "FROM golang:"+m.GoVersion+"-alpine") {
+				t.Fatalf("Dockerfile does not use selected Go version:\n%s", dockerfile)
+			}
+			makefile, err := os.ReadFile(filepath.Join(project, "Makefile"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(makefile), "SCORE_MIN ?= 80") || !strings.Contains(string(makefile), "gokub score --fail-under $(SCORE_MIN)") || !strings.Contains(string(makefile), "gokub graph --check") {
+				t.Fatal("generated Makefile is missing the configurable quality gate")
+			}
+			tasks, err := os.ReadFile(filepath.Join(project, ".vscode", "tasks.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(tasks), "GOKUB: Quality Gate") || !strings.Contains(string(tasks), "gokubScoreMin") || !strings.Contains(string(tasks), "GOKUB: Architecture Check") {
+				t.Fatal("generated VS Code tasks are missing the quality gate")
+			}
+			workflow, err := os.ReadFile(filepath.Join(project, ".github", "workflows", "ci.yml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(workflow), `go-version: "`+m.GoVersion+`.x"`) {
+				t.Fatalf("standard template CI does not match go.mod:\n%s", workflow)
 			}
 		})
 	}

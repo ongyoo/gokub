@@ -5,6 +5,9 @@ function executable() {
 }
 
 function shellQuote(value) {
+  if (process.platform === "win32") {
+    return `'${String(value).replaceAll("'", "''")}'`;
+  }
   return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
@@ -41,6 +44,29 @@ async function addTemplate() {
   runInteractive(["template", "add", name, selected[0].fsPath], "GOKUB Templates");
 }
 
+async function installTemplate() {
+  const repository = await vscode.window.showInputBox({
+    title: "Community template repository",
+    prompt: "GitHub owner/repository or HTTPS URL",
+    placeHolder: "owner/go-service-template"
+  });
+  if (!repository) return;
+  runInteractive(["template", "install", repository], "GOKUB Community Templates");
+}
+
+async function searchTemplates() {
+  const query = await vscode.window.showInputBox({
+    title: "Search community templates",
+    prompt: "Optional keywords; leave empty to browse popular templates",
+    placeHolder: "api postgres"
+  });
+  if (query === undefined) return;
+  const args = ["template", "search"];
+  if (query.trim()) args.push(query.trim());
+  args.push("--install");
+  runInteractive(args, "GOKUB Community Templates");
+}
+
 async function addFeature() {
   const feature = await vscode.window.showQuickPick(
     ["auth", "crud", "redis", "postgres", "mongodb", "kafka", "rabbitmq", "nats", "grpc", "cron", "email", "websocket", "otel", "docker", "github-actions"],
@@ -54,6 +80,25 @@ async function addFeature() {
     args.push(name);
   }
   runInteractive(args, "GOKUB Features");
+}
+
+async function generateModel() {
+  const selected = await vscode.window.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    filters: { JSON: ["json"] },
+    openLabel: "Generate Go Model"
+  });
+  if (!selected?.length) return;
+  const suggested = selected[0].path.split("/").at(-1).replace(/(?:\.schema)?\.json$/i, "");
+  const name = await vscode.window.showInputBox({
+    title: "Go model name",
+    value: suggested,
+    prompt: "Example: user or payment-event"
+  });
+  if (!name) return;
+  runInteractive(["add", "model", name, "--from", selected[0].fsPath], "GOKUB Model Generator");
 }
 
 async function openMCPConfig() {
@@ -79,16 +124,75 @@ async function installSkills() {
   runInteractive(["skill", "install", "--agent", agent], "GOKUB Agent Skills");
 }
 
+async function createPlugin() {
+  const name = await vscode.window.showInputBox({
+    title: "Plugin name",
+    prompt: "Lowercase letters, numbers, and hyphens",
+    placeHolder: "api-audit"
+  });
+  if (!name) return;
+  runInteractive(["plugin", "create", name], "GOKUB Plugins");
+}
+
+async function installPlugin() {
+  const selected = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: "Install GOKUB Plugin"
+  });
+  if (!selected?.length) return;
+  runInteractive(["plugin", "install", selected[0].fsPath], "GOKUB Plugins");
+}
+
+async function packPlugin() {
+  const selected = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    openLabel: "Package GOKUB Plugin"
+  });
+  if (!selected?.length) return;
+  runInteractive(["plugin", "pack", selected[0].fsPath], "GOKUB Plugins");
+}
+
+async function qualityGate() {
+  const minimum = await vscode.window.showInputBox({
+    title: "Minimum GOKUB project score",
+    value: "80",
+    validateInput: (value) => {
+      const score = Number(value);
+      return Number.isInteger(score) && score >= 0 && score <= 100 ? undefined : "Enter an integer from 0 to 100.";
+    }
+  });
+  if (minimum === undefined) return;
+  runInteractive(["score", "--fail-under", minimum], "GOKUB Quality Gate");
+}
+
 function activate(context) {
   const commands = {
+    "gokub.open": () => runInteractive([], "GOKUB Command Center"),
     "gokub.newProject": () => runInteractive(["new"], "GOKUB New Project"),
     "gokub.addTemplate": addTemplate,
+    "gokub.installTemplate": installTemplate,
+    "gokub.searchTemplates": searchTemplates,
     "gokub.listTemplates": () => runInteractive(["template", "list"], "GOKUB Templates"),
     "gokub.addFeature": addFeature,
+    "gokub.generateModel": generateModel,
     "gokub.status": () => runInteractive(["status"], "GOKUB Status"),
     "gokub.doctor": () => runInteractive(["doctor"], "GOKUB Doctor"),
+    "gokub.score": () => runInteractive(["score"], "GOKUB Project Score"),
+    "gokub.qualityGate": qualityGate,
+    "gokub.graph": () => runInteractive(["graph"], "GOKUB Dependency Graph"),
+    "gokub.architectureCheck": () => runInteractive(["graph", "--check"], "GOKUB Architecture Check"),
+    "gokub.upgrade": () => runInteractive(["upgrade"], "GOKUB Project Upgrade"),
+    "gokub.updateCLI": () => runInteractive(["update"], "GOKUB CLI Update"),
     "gokub.openMCPConfig": openMCPConfig,
     "gokub.installSkills": installSkills,
+    "gokub.createPlugin": createPlugin,
+    "gokub.installPlugin": installPlugin,
+    "gokub.packPlugin": packPlugin,
+    "gokub.listPlugins": () => runInteractive(["plugin", "list"], "GOKUB Plugins"),
     "gokub.uninstall": () => runInteractive(["uninstall"], "GOKUB Uninstall")
   };
   for (const [name, handler] of Object.entries(commands)) {
@@ -97,8 +201,8 @@ function activate(context) {
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.text = "$(tools) GOKUB";
-  status.tooltip = "Create a GOKUB project";
-  status.command = "gokub.newProject";
+  status.tooltip = "Open GOKUB Command Center";
+  status.command = "gokub.open";
   status.show();
   context.subscriptions.push(status);
 }

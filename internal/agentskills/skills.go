@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	gokub "github.com/gokub/gokub"
+	gokub "github.com/ongyoo/gokub"
 )
 
 const (

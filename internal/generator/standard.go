@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	gokub "github.com/gokub/gokub"
-	"github.com/gokub/gokub/internal/agentskills"
-	"github.com/gokub/gokub/internal/manifest"
+	gokub "github.com/ongyoo/gokub"
+	"github.com/ongyoo/gokub/internal/agentskills"
+	"github.com/ongyoo/gokub/internal/manifest"
 )
 
 func newStandardProject(root string, m manifest.Manifest) error {
@@ -44,7 +44,7 @@ func newStandardProject(root string, m manifest.Manifest) error {
 		}
 	}
 	files := map[string]string{
-		"go.mod":                                           standardModuleFile(m.Module),
+		"go.mod":                                           standardModuleFile(m.Module, m.GoVersion),
 		"internal/config/config.go":                        configFile(),
 		"internal/health/health.go":                        healthFile(),
 		"internal/http/server.go":                          serverFile(m),
@@ -70,14 +70,14 @@ func newStandardProject(root string, m manifest.Manifest) error {
 		"tools/dependencies.go":                            dependencyPinsFile(),
 		"README.md":                                        standardReadmeFile(m, commands),
 		"Makefile":                                         standardMakefile(commands[0]),
-		"Dockerfile":                                       standardDockerfile(commands[0]),
+		"Dockerfile":                                       standardDockerfile(commands[0], m.GoVersion),
 		"docker-compose.yml":                               standardComposeFile(m, commands),
 		".gitignore":                                       gitignore(),
 		".dockerignore":                                    dockerignore(),
 		".env.example":                                     standardEnvFile(m),
 		"AGENTS.md":                                        agentsFile(m),
 		"CLAUDE.md":                                        claudeFile(m),
-		".github/workflows/ci.yml":                         ciFile(),
+		".github/workflows/ci.yml":                         ciFile(ciGoVersion(m)),
 		".vscode/launch.json":                              standardVSCodeFile(commands),
 		".vscode/tasks.json":                               vscodeTasksFile(),
 		".run/GOKUB.run.xml":                               standardJetBrainsFile(m, commands[0]),
@@ -115,10 +115,10 @@ func newStandardProject(root string, m manifest.Manifest) error {
 	return nil
 }
 
-func standardModuleFile(module string) string {
+func standardModuleFile(module, goVersion string) string {
 	return fmt.Sprintf(`module %s
 
-go 1.25
+go %s
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
@@ -138,7 +138,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	go.opentelemetry.io/otel v1.44.0
 )
-`, module)
+`, module, goVersion)
 }
 
 func standardModelFile() string {
@@ -547,7 +547,9 @@ func commandList(commands []string) string {
 }
 
 func standardMakefile(command string) string {
-	return fmt.Sprintf(`.PHONY: run test build fmt vet tidy doctor
+	return fmt.Sprintf(`SCORE_MIN ?= 80
+
+.PHONY: run test build fmt vet tidy doctor score graph graph-check upgrade
 
 run:
 	go run ./cmd/%s
@@ -569,11 +571,23 @@ tidy:
 
 doctor:
 	gokub doctor
+
+score:
+	gokub score --fail-under $(SCORE_MIN)
+
+graph:
+	gokub graph
+
+graph-check:
+	gokub graph --check
+
+upgrade:
+	gokub upgrade
 `, command)
 }
 
-func standardDockerfile(command string) string {
-	return fmt.Sprintf(`FROM golang:1.25-alpine AS build
+func standardDockerfile(command, goVersion string) string {
+	return fmt.Sprintf(`FROM golang:%s-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -587,7 +601,7 @@ USER nonroot:nonroot
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/app", "healthcheck"]
 ENTRYPOINT ["/app"]
-`, command)
+`, goVersion, command)
 }
 
 func standardComposeFile(m manifest.Manifest, commands []string) string {

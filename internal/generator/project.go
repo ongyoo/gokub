@@ -7,15 +7,25 @@ import (
 	"regexp"
 	"strings"
 
-	gokub "github.com/gokub/gokub"
-	"github.com/gokub/gokub/internal/agentskills"
-	"github.com/gokub/gokub/internal/manifest"
-	customtemplates "github.com/gokub/gokub/internal/templates"
+	gokub "github.com/ongyoo/gokub"
+	"github.com/ongyoo/gokub/internal/agentskills"
+	"github.com/ongyoo/gokub/internal/goversion"
+	"github.com/ongyoo/gokub/internal/manifest"
+	customtemplates "github.com/ongyoo/gokub/internal/templates"
 )
 
 var resourceNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 
 func NewProject(root string, m manifest.Manifest) error {
+	if m.SchemaVersion == 0 {
+		m.SchemaVersion = manifest.CurrentSchemaVersion
+	}
+	if m.GeneratorVersion == "" {
+		m.GeneratorVersion = gokub.Version
+	}
+	if m.GoVersion == "" {
+		m.GoVersion = goversion.Recommended
+	}
 	if err := manifest.Validate(m); err != nil {
 		return err
 	}
@@ -64,7 +74,7 @@ func NewProject(root string, m manifest.Manifest) error {
 		}
 	}
 	files := map[string]string{
-		"go.mod":                       moduleFile(m.Module),
+		"go.mod":                       moduleFile(m.Module, m.GoVersion),
 		"cmd/" + m.Name + "/main.go":   mainFile(m),
 		"internal/config/config.go":    configFile(),
 		"internal/health/health.go":    healthFile(),
@@ -80,7 +90,7 @@ func NewProject(root string, m manifest.Manifest) error {
 		".env.example":                 envExample(m),
 		"AGENTS.md":                    agentsFile(m),
 		"CLAUDE.md":                    claudeFile(m),
-		".github/workflows/ci.yml":     ciFile(),
+		".github/workflows/ci.yml":     ciFile(ciGoVersion(m)),
 		".vscode/launch.json":          vscodeLaunchFile(m),
 		".vscode/tasks.json":           vscodeTasksFile(),
 		".run/GOKUB.run.xml":           jetbrainsRunFile(m),
@@ -178,7 +188,11 @@ func AddFeature(root, feature, name string) error {
 	case "docker":
 		return writeNew(filepath.Join(root, "deployments", "docker.md"), "# Docker\n\nDocker support is enabled for this project.\n")
 	case "github-actions":
-		return writeNew(filepath.Join(root, ".github", "workflows", "ci.yml"), ciFile())
+		m, err := manifest.Read(filepath.Join(root, manifest.FileName))
+		if err != nil {
+			return fmt.Errorf("read project manifest: %w", err)
+		}
+		return writeNew(filepath.Join(root, ".github", "workflows", "ci.yml"), ciFile(ciGoVersion(m)))
 	default:
 		return fmt.Errorf("unknown feature %q", feature)
 	}
@@ -224,8 +238,8 @@ func writeNewBytes(path string, content []byte) error {
 	return os.WriteFile(path, content, 0o644)
 }
 
-func moduleFile(module string) string {
-	return "module " + module + "\n\ngo 1.24\n"
+func moduleFile(module, goVersion string) string {
+	return "module " + module + "\n\ngo " + goVersion + "\n"
 }
 
 func mainFile(m manifest.Manifest) string {
@@ -615,7 +629,9 @@ Codex reads `+"`.codex/config.toml`"+`; Claude and compatible clients can read
 }
 
 func makefile(m manifest.Manifest) string {
-	return fmt.Sprintf(`.PHONY: run test build fmt doctor
+	return fmt.Sprintf(`SCORE_MIN ?= 80
+
+.PHONY: run test build fmt doctor score graph graph-check upgrade
 
 run:
 	go run ./cmd/%s
@@ -631,6 +647,18 @@ fmt:
 
 doctor:
 	gokub doctor
+
+score:
+	gokub score --fail-under $(SCORE_MIN)
+
+graph:
+	gokub graph
+
+graph-check:
+	gokub graph --check
+
+upgrade:
+	gokub upgrade
 `, m.Name)
 }
 
@@ -679,6 +707,26 @@ func vscodeTasksFile() string {
       "command": "go build ./...",
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": "$go"
+    },
+    {
+      "label": "GOKUB: Quality Gate",
+      "type": "shell",
+      "command": "gokub score --fail-under ${input:gokubScoreMin}",
+      "problemMatcher": []
+    },
+    {
+      "label": "GOKUB: Architecture Check",
+      "type": "shell",
+      "command": "gokub graph --check",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "gokubScoreMin",
+      "type": "promptString",
+      "description": "Minimum GOKUB project score",
+      "default": "80"
     }
   ]
 }
@@ -742,6 +790,8 @@ You are working in a GOKUB-generated Go service.
 go test ./...
 go run ./cmd/%s
 gokub doctor
+gokub score
+gokub graph
 `+"```"+`
 
 ## Workflow Rules
@@ -752,9 +802,12 @@ gokub doctor
 - Keep `+"`.gokub.yaml`"+` in sync when generated capabilities change.
 - Do not hand-edit generated wiring if a GOKUB command can perform the change.
 - Run `+"`gokub doctor`"+` after structural changes.
-- Prefer GOKUB MCP tools for project status, health checks, features, and recipes when available.
+- Run `+"`gokub score`"+` before delivery and review its recommendations.
+- Use `+"`gokub graph`"+` to inspect package dependencies before changing boundaries.
+- Prefer GOKUB MCP tools for project status, health checks, scoring, dependency graphs, features, and recipes when available.
 - Use the relevant skill under `+"`.agents/skills`"+` for project, domain, and verification workflows.
 - Never edit secrets or commit `+"`.env`"+` files.
+- Never run an unreviewed GOKUB plugin; plugin execution is an explicit trust decision.
 
 `, m.Name, m.Module, m.Template, m.Style, m.Architecture, m.Name)
 }
@@ -770,6 +823,8 @@ This repository is a GOKUB-generated Go service.
 go test ./...
 go run ./cmd/%s
 gokub doctor
+gokub score
+gokub graph
 `+"```"+`
 
 ## GOKUB Context
@@ -785,7 +840,7 @@ gokub doctor
 }
 
 func dockerfile(m manifest.Manifest) string {
-	return fmt.Sprintf(`FROM golang:1.24-alpine AS build
+	return fmt.Sprintf(`FROM golang:%s-alpine AS build
 WORKDIR /src
 COPY go.mod ./
 COPY . .
@@ -797,7 +852,7 @@ USER nonroot:nonroot
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/app", "healthcheck"]
 ENTRYPOINT ["/app"]
-`, m.Name)
+`, m.GoVersion, m.Name)
 }
 
 func composeFile(m manifest.Manifest) string {
@@ -817,8 +872,8 @@ func composeFile(m manifest.Manifest) string {
 `, m.Name)
 }
 
-func ciFile() string {
-	return `name: ci
+func ciFile(goVersion string) string {
+	return fmt.Sprintf(`name: ci
 
 on:
   push:
@@ -831,13 +886,20 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24.x"
+          go-version: "%s.x"
           cache: true
       - run: gofmt -l . | tee /tmp/gofmt.out && test ! -s /tmp/gofmt.out
       - run: go vet ./...
       - run: go test -race -coverprofile=coverage.out ./...
       - run: go build ./...
-`
+`, goVersion)
+}
+
+func ciGoVersion(m manifest.Manifest) string {
+	if m.GoVersion == "" {
+		return goversion.Recommended
+	}
+	return m.GoVersion
 }
 
 func gitignore() string {
@@ -850,6 +912,7 @@ tmp/
 coverage.out
 .idea/
 .DS_Store
+.gokub.yaml*.bak
 `
 }
 

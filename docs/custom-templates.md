@@ -33,10 +33,48 @@ gokub template add team-service ./my-service
 
 Run `gokub new` and select the installed template with Up/Down and Enter.
 
+## Install From GitHub
+
+Search public repositories carrying the `gokub-template` GitHub topic:
+
+```bash
+gokub template search
+gokub template search api
+gokub template search api --install
+```
+
+`--install` opens an arrow-key selector and then uses the same validated installer.
+Set `GITHUB_TOKEN` when using search heavily or from CI to increase the GitHub API
+rate limit. Search reads repository metadata only and does not clone code.
+
+Install a public community template without cloning it manually:
+
+```bash
+gokub template install owner/go-service-template
+gokub template install https://github.com/owner/go-service-template
+```
+
+Pin a reviewed branch or tag and select a template from a monorepo:
+
+```bash
+gokub template install owner/go-templates \
+  --ref v1.2.0 \
+  --subdir templates/api \
+  --name team-api
+```
+
+Remote installation accepts HTTPS GitHub repositories without embedded credentials.
+GOKUB performs a shallow clone with a timeout, copies through the same secret and
+symlink filters as local templates, removes Git metadata, and records source/ref
+metadata in the private template store. Review third-party source before generating
+a project from it.
+
 ## Commands
 
 ```bash
 gokub template list
+gokub template search [query]
+gokub template install <owner/repo>
 gokub template add <path>
 gokub template add <name> <path>
 gokub template remove <name>
@@ -58,6 +96,7 @@ Placeholders work in text-file contents, file names, and directory names.
 |---|---|
 | `{{project_name}}` | `payments-api` |
 | `{{module}}` | `github.com/example/payments-api` |
+| `{{go_version}}` | `1.26`, `1.25`, or the selected custom version |
 | `{{template}}` | `team-service` |
 | `{{style}}` | `monolith` or `microservices` |
 | `{{framework}}` | `gin`, `fiber`, `grpc`, or `none` |
@@ -70,7 +109,7 @@ Example `go.mod`:
 ```go
 module {{module}}
 
-go 1.25
+go {{go_version}}
 ```
 
 Example source path:
@@ -119,9 +158,9 @@ gokub template add team-service ./templates/team-service
 gokub new smoke-test --template team-service --module example.com/smoke-test
 ```
 
-For a team, keep template source in its own reviewed repository and install it from
-a checked-out path. Pin the repository revision in CI before calling
-`gokub template add`.
+For a team, keep template source in its own reviewed repository and pin a release
+tag with `gokub template install --ref`. A checked-out path and `template add`
+remain available for private repositories authenticated by your existing Git tools.
 
 ## Debugging
 

@@ -29,11 +29,16 @@ go test -race ./...
 go vet ./...
 go build ./...
 gokub doctor
+gokub score
+gokub graph
+gokub upgrade --check
 ```
 
 For HTTP changes, exercise health endpoints and affected routes. For dependency
 changes, run `go mod tidy`, inspect `go.mod` and `go.sum`, and ensure no unexplained
 module churn. For container or CI changes, validate YAML and build definitions.
+Address score recommendations caused by the change or explain why they are not
+applicable.
 
 ## Report
 

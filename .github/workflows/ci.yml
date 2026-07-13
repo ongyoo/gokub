@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go:
+          - "1.22.x"
+          - "1.25.x"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Check module files
+        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+      - name: Test
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build ./cmd/gokub
+      - name: Test Linux arrow-key wizard
+        run: ./scripts/test-linux-wizard.sh
+      - name: Test installer security
+        run: ./scripts/test-installer.sh
+      - name: Test release packaging
+        run: ./scripts/test-packaging.sh
+
+  extension:
+    name: verify VS Code extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+      - name: Install dependencies
+        working-directory: vscode-extension
+        run: npm ci
+      - name: Audit dependencies
+        working-directory: vscode-extension
+        run: npm audit --audit-level=high
+      - name: Test extension
+        working-directory: vscode-extension
+        run: npm test
+      - name: Package extension
+        working-directory: vscode-extension
+        run: mkdir -p ../dist && npm run package
