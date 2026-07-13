@@ -1,6 +1,10 @@
 package gokub
 
-import "embed"
+import (
+	"embed"
+	"runtime/debug"
+	"strings"
+)
 
 // Assets embeds files required by generated projects and agent integrations.
 //
@@ -14,3 +18,21 @@ var (
 	Commit     = "dev"
 	BuildDate  = "unknown"
 )
+
+func init() {
+	if Version != "0.1.0" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	Version = releasedModuleVersion(Version, info.Main.Version)
+}
+
+func releasedModuleVersion(fallback, moduleVersion string) string {
+	if moduleVersion == "" || moduleVersion == "(devel)" {
+		return fallback
+	}
+	return strings.TrimPrefix(moduleVersion, "v")
+}
