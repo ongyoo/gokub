@@ -59,6 +59,9 @@ jobs:
           npm version "${RELEASE_VERSION#v}" --no-git-tag-version
           mkdir -p ../dist
           npm run package
+          git checkout -- package.json package-lock.json
+      - name: Check clean release checkout
+        run: git diff --exit-code
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
