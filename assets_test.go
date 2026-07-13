@@ -8,6 +8,9 @@ func TestReleasedModuleVersion(t *testing.T) {
 		want   string
 	}{
 		{module: "v0.2.3", want: "0.2.3"},
+		{module: "v0.2.3-beta.1", want: "0.2.3-beta.1"},
+		{module: "v0.2.3-0.20260713064030-ff757a12cbb1", want: "0.1.0"},
+		{module: "v0.2.3-0.20260713064030-ff757a12cbb1+dirty", want: "0.1.0"},
 		{module: "(devel)", want: "0.1.0"},
 		{module: "", want: "0.1.0"},
 	} {

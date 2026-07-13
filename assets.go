@@ -2,9 +2,12 @@ package gokub
 
 import (
 	"embed"
+	"regexp"
 	"runtime/debug"
 	"strings"
 )
+
+var pseudoVersionPattern = regexp.MustCompile(`\.\d{14}-[0-9a-f]{12,}(?:\+.*)?$`)
 
 // Assets embeds files required by generated projects and agent integrations.
 //
@@ -31,7 +34,7 @@ func init() {
 }
 
 func releasedModuleVersion(fallback, moduleVersion string) string {
-	if moduleVersion == "" || moduleVersion == "(devel)" {
+	if moduleVersion == "" || moduleVersion == "(devel)" || pseudoVersionPattern.MatchString(moduleVersion) {
 		return fallback
 	}
 	return strings.TrimPrefix(moduleVersion, "v")
