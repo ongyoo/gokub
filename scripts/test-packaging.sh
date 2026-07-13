@@ -29,12 +29,12 @@ if ./scripts/render-homebrew-formula.sh v1.2.3 "$TEMP/incomplete.txt" "$TEMP/inv
 fi
 
 mkdir -p "$TEMP/release/input" "$TEMP/release/dist"
-go build -o "$TEMP/release/input/gokub" ./cmd/gokub
+go build -ldflags "-X github.com/ongyoo/gokub.Version=1.2.3" -o "$TEMP/release/input/gokub" ./cmd/gokub
 for asset in \
-  gokub_0.1.0_Darwin_arm64.tar.gz \
-  gokub_0.1.0_Darwin_x86_64.tar.gz \
-  gokub_0.1.0_Linux_arm64.tar.gz \
-  gokub_0.1.0_Linux_x86_64.tar.gz; do
+  gokub_1.2.3_Darwin_arm64.tar.gz \
+  gokub_1.2.3_Darwin_x86_64.tar.gz \
+  gokub_1.2.3_Linux_arm64.tar.gz \
+  gokub_1.2.3_Linux_x86_64.tar.gz; do
   tar -czf "$TEMP/release/dist/$asset" -C "$TEMP/release/input" gokub
   if command -v sha256sum >/dev/null 2>&1; then
     digest="$(sha256sum "$TEMP/release/dist/$asset" | awk '{print $1}')"
@@ -43,14 +43,14 @@ for asset in \
   fi
   printf '%s  %s\n' "$digest" "$asset" >> "$TEMP/release/dist/checksums.txt"
 done
-GOKUB_ALLOW_DEV_PROVENANCE=1 ./scripts/verify-release-artifacts.sh v0.1.0 "$TEMP/release/dist" >/dev/null
-if ./scripts/verify-release-artifacts.sh v0.1.0 "$TEMP/release/dist" >/dev/null 2>&1; then
+GOKUB_ALLOW_DEV_PROVENANCE=1 ./scripts/verify-release-artifacts.sh v1.2.3 "$TEMP/release/dist" >/dev/null
+if ./scripts/verify-release-artifacts.sh v1.2.3 "$TEMP/release/dist" >/dev/null 2>&1; then
   printf 'release verifier accepted development provenance\n' >&2
   exit 1
 fi
 
-printf 'corrupt' >> "$TEMP/release/dist/gokub_0.1.0_Linux_arm64.tar.gz"
-if GOKUB_ALLOW_DEV_PROVENANCE=1 ./scripts/verify-release-artifacts.sh v0.1.0 "$TEMP/release/dist" >/dev/null 2>&1; then
+printf 'corrupt' >> "$TEMP/release/dist/gokub_1.2.3_Linux_arm64.tar.gz"
+if GOKUB_ALLOW_DEV_PROVENANCE=1 ./scripts/verify-release-artifacts.sh v1.2.3 "$TEMP/release/dist" >/dev/null 2>&1; then
   printf 'release verifier accepted a corrupted archive\n' >&2
   exit 1
 fi
