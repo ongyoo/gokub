@@ -701,29 +701,19 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 			*goVersion = strings.Fields(selection)[0]
 		}
 	}
-	if wizard && !setFlags["style"] {
-		*style = prompts.choice("Project style", []string{"monolith", "microservices"}, *style)
-	}
+	// Only ask about a template when the user has installed community templates;
+	// otherwise the built-in kit generator is used and the question is noise.
 	if wizard && !setFlags["template"] {
-		if *style == "microservices" {
-			*template = "microservices"
-		} else {
-			*template = "monolith"
+		if names, err := customtemplates.Names(); err == nil && len(names) > 0 {
+			templateOptions := append([]string{"gin-clean", "fiber-clean"}, names...)
+			*template = prompts.choice("Template", templateOptions, *template)
 		}
-		templateOptions := []string{"monolith", "microservices", "gin-clean", "fiber-clean", "worker", "grpc-service"}
-		if names, err := customtemplates.Names(); err == nil {
-			templateOptions = append(templateOptions, names...)
-		}
-		*template = prompts.choice("Template", templateOptions, *template)
 	}
 	if wizard && !setFlags["framework"] {
 		*framework = prompts.choice("Framework", []string{"gin", "fiber", "echo"}, *framework)
 	}
 	if wizard && !setFlags["database"] {
 		*database = prompts.choice("Database", []string{"postgres", "mongodb", "none"}, *database)
-	}
-	if wizard && !setFlags["architecture"] {
-		*architecture = prompts.choice("Architecture", []string{"clean", "hexagonal", "layered"}, *architecture)
 	}
 	if wizard && !setFlags["messaging"] {
 		*messaging = prompts.choice("Messaging", []string{"none", "kafka", "rabbitmq", "nats"}, *messaging)
@@ -1742,8 +1732,14 @@ func newWizardTotal(wizard bool, argCount int, positionalName string, module str
 	if module == "" {
 		total++
 	}
-	for _, name := range []string{"go-version", "style", "template", "framework", "database", "architecture", "messaging", "agents", "recipe"} {
+	for _, name := range []string{"go-version", "framework", "database", "messaging", "agents", "recipe"} {
 		if !setFlags[name] {
+			total++
+		}
+	}
+	// A template is only asked when community templates are installed.
+	if !setFlags["template"] {
+		if names, err := customtemplates.Names(); err == nil && len(names) > 0 {
 			total++
 		}
 	}
@@ -1760,11 +1756,8 @@ func renderProjectSummary(out io.Writer, m manifest.Manifest, recipe string) {
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("name        "), pal.silver(m.Name))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("module      "), pal.silver(m.Module))
 	fmt.Fprintf(out, "  %s %s %s\n", pal.dim("go          "), pal.amber(m.GoVersion), pal.dim(goversion.Description(m.GoVersion)))
-	fmt.Fprintf(out, "  %s %s\n", pal.dim("template    "), pal.amber(m.Template))
-	fmt.Fprintf(out, "  %s %s\n", pal.dim("style       "), pal.silver(m.Style))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("framework   "), pal.silver(m.Framework))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("database    "), pal.silver(m.Database))
-	fmt.Fprintf(out, "  %s %s\n", pal.dim("architecture"), pal.silver(m.Architecture))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("messaging   "), pal.silver(m.Messaging))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("vibe coding "), pal.silver(m.Agents))
 	fmt.Fprintf(out, "  %s %s\n\n", pal.dim("recipe      "), pal.amber(recipe))
