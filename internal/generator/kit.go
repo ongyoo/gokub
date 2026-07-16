@@ -72,6 +72,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"pkg/httpserver/" + m.Framework,
 		"pkg/middleware/" + m.Framework,
 		"pkg/utils",
+		"pkg/validator",
 		"tests",
 		"docs",
 		".github/workflows",
@@ -102,6 +103,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"pkg/error/error.go":                               kitErrorFile(),
 		"pkg/database/postgresql/postgres.go":              kitPostgresFile(),
 		"pkg/utils/utils.go":                               kitUtilsFile(),
+		"pkg/validator/validator.go":                       kitValidatorFile(),
 		"pkg/httpserver/" + m.Framework + "/http.go":       kitHTTPServerFile(m.Framework),
 		"pkg/middleware/" + m.Framework + "/middleware.go": kitMiddlewareFile(m.Framework),
 		"cmd/" + service + "/main.go":                      kitMainFile(m.Module, m.Framework, domain),
@@ -1000,6 +1002,38 @@ func (s *Secret) Scan(value any) error {
 
 // String returns the plaintext value.
 func (s Secret) String() string { return string(s) }
+`
+}
+
+func kitValidatorFile() string {
+	return `package validator
+
+import (
+	"errors"
+	"strings"
+
+	govalidator "github.com/go-playground/validator/v10"
+)
+
+var validate = govalidator.New(govalidator.WithRequiredStructEnabled())
+
+// Struct validates s against its ` + "`validate`" + ` struct tags and returns a
+// readable aggregated error, or nil when the value is valid.
+func Struct(s any) error {
+	err := validate.Struct(s)
+	if err == nil {
+		return nil
+	}
+	var fieldErrors govalidator.ValidationErrors
+	if !errors.As(err, &fieldErrors) {
+		return err
+	}
+	messages := make([]string, 0, len(fieldErrors))
+	for _, fe := range fieldErrors {
+		messages = append(messages, fe.Field()+" is invalid ("+fe.Tag()+")")
+	}
+	return errors.New("validation failed: " + strings.Join(messages, "; "))
+}
 `
 }
 

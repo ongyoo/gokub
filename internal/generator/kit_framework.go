@@ -543,6 +543,7 @@ import (
 
 	"%[1]s/pkg/api"
 	"%[1]s/pkg/utils"
+	"%[1]s/pkg/validator"
 )
 
 // Handler exposes the %[3]s HTTP endpoints.
@@ -556,8 +557,8 @@ func NewHandler(service Service) Handler {
 }
 
 type exampleRequest struct {
-	Name  string  `+tick+`json:"name"`+tick+`
-	Price float64 `+tick+`json:"price"`+tick+`
+	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
+	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
 }
 
 // List godoc
@@ -597,6 +598,9 @@ func (h Handler) List(c fiber.Ctx) error {
 func (h Handler) Create(c fiber.Ctx) error {
 	var req exampleRequest
 	if err := c.Bind().Body(&req); err != nil {
+		return fail(c, http.StatusBadRequest, err.Error())
+	}
+	if err := validator.Struct(req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
 	}
 	item := %[3]s{Name: req.Name, Price: req.Price}
@@ -714,6 +718,7 @@ import (
 
 	"%[1]s/pkg/api"
 	"%[1]s/pkg/utils"
+	"%[1]s/pkg/validator"
 )
 
 // Handler exposes the %[3]s HTTP endpoints.
@@ -727,8 +732,8 @@ func NewHandler(service Service) Handler {
 }
 
 type exampleRequest struct {
-	Name  string  `+tick+`json:"name"`+tick+`
-	Price float64 `+tick+`json:"price"`+tick+`
+	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
+	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
 }
 
 // List godoc
@@ -769,6 +774,10 @@ func (h Handler) List(c *gin.Context) {
 func (h Handler) Create(c *gin.Context) {
 	var req exampleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validator.Struct(req); err != nil {
 		fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -893,6 +902,7 @@ import (
 
 	"%[1]s/pkg/api"
 	"%[1]s/pkg/utils"
+	"%[1]s/pkg/validator"
 )
 
 // Handler exposes the %[3]s HTTP endpoints.
@@ -906,8 +916,8 @@ func NewHandler(service Service) Handler {
 }
 
 type exampleRequest struct {
-	Name  string  `+tick+`json:"name"`+tick+`
-	Price float64 `+tick+`json:"price"`+tick+`
+	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
+	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
 }
 
 // List godoc
@@ -947,6 +957,9 @@ func (h Handler) List(c echo.Context) error {
 func (h Handler) Create(c echo.Context) error {
 	var req exampleRequest
 	if err := c.Bind(&req); err != nil {
+		return fail(c, http.StatusBadRequest, err.Error())
+	}
+	if err := validator.Struct(req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
 	}
 	item := %[3]s{Name: req.Name, Price: req.Price}
