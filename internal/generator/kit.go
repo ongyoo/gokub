@@ -580,6 +580,8 @@ import (
 	"%[2]s/internal/app/events"
 )
 
+//go:generate mockgen -destination=./mocks/service_mock.go -package=mocks -source=service.go Service
+
 // Service is the business API for the %[3]s module.
 type Service interface {
 	AutoMigrate(ctx context.Context) error

@@ -535,8 +535,8 @@ type Handler struct {
 }
 
 // NewHandler builds a Handler over the %[3]s service.
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service) Handler {
+	return Handler{service: service}
 }
 
 type exampleRequest struct {
@@ -544,7 +544,16 @@ type exampleRequest struct {
 	Price float64 `+tick+`json:"price"`+tick+`
 }
 
-func (h *Handler) list(c fiber.Ctx) error {
+// List godoc
+// @Summary  List %[3]s records
+// @Tags     %[2]s
+// @Produce  json
+// @Param    page      query  int     false  "page number"
+// @Param    pageSize  query  int     false  "page size"
+// @Param    search    query  string  false  "search term"
+// @Success  200  {object}  api.PaginatedContent[[]%[3]s]
+// @Router   /%[2]ss [get]
+func (h Handler) List(c fiber.Ctx) error {
 	page := utils.Atoi(c.Query("page"), 1)
 	pageSize := utils.Atoi(c.Query("pageSize"), 20)
 	items, total, err := h.service.List(c.Context(), Query{Page: page, PageSize: pageSize, Search: c.Query("search")})
@@ -560,7 +569,16 @@ func (h *Handler) list(c fiber.Ctx) error {
 	})
 }
 
-func (h *Handler) create(c fiber.Ctx) error {
+// Create godoc
+// @Summary  Create a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    body  body  exampleRequest  true  "payload"
+// @Success  201  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss [post]
+func (h Handler) Create(c fiber.Ctx) error {
 	var req exampleRequest
 	if err := c.Bind().Body(&req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
@@ -572,7 +590,15 @@ func (h *Handler) create(c fiber.Ctx) error {
 	return c.Status(http.StatusCreated).JSON(api.APIResponse[%[3]s]{Success: true, Result: item})
 }
 
-func (h *Handler) get(c fiber.Ctx) error {
+// Get godoc
+// @Summary  Get a %[3]s by id
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  404  {object}  api.APIError
+// @Router   /%[2]ss/{id} [get]
+func (h Handler) Get(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -584,7 +610,17 @@ func (h *Handler) get(c fiber.Ctx) error {
 	return c.JSON(api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) update(c fiber.Ctx) error {
+// Update godoc
+// @Summary  Update a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    id    path  string          true  "identifier"
+// @Param    body  body  map[string]any  true  "fields to update"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss/{id} [patch]
+func (h Handler) Update(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -600,7 +636,14 @@ func (h *Handler) update(c fiber.Ctx) error {
 	return c.JSON(api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) remove(c fiber.Ctx) error {
+// Delete godoc
+// @Summary  Delete a %[3]s
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIMessage
+// @Router   /%[2]ss/{id} [delete]
+func (h Handler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -631,15 +674,15 @@ import "github.com/gofiber/fiber/v3"
 
 // SetRoutes attaches the resource endpoints to the router group, applying any
 // group-scoped middleware passed by the caller.
-func SetRoutes(router fiber.Router, h *Handler, middlewares ...fiber.Handler) {
+func SetRoutes(router fiber.Router, h Handler, middlewares ...fiber.Handler) {
 	for _, m := range middlewares {
 		router.Use(m)
 	}
-	router.Get("/", h.list)
-	router.Post("/", h.create)
-	router.Get("/:id", h.get)
-	router.Patch("/:id", h.update)
-	router.Delete("/:id", h.remove)
+	router.Get("/", h.List)
+	router.Post("/", h.Create)
+	router.Get("/:id", h.Get)
+	router.Patch("/:id", h.Update)
+	router.Delete("/:id", h.Delete)
 }
 `, domain)
 }
@@ -663,8 +706,8 @@ type Handler struct {
 }
 
 // NewHandler builds a Handler over the %[3]s service.
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service) Handler {
+	return Handler{service: service}
 }
 
 type exampleRequest struct {
@@ -672,7 +715,16 @@ type exampleRequest struct {
 	Price float64 `+tick+`json:"price"`+tick+`
 }
 
-func (h *Handler) list(c *gin.Context) {
+// List godoc
+// @Summary  List %[3]s records
+// @Tags     %[2]s
+// @Produce  json
+// @Param    page      query  int     false  "page number"
+// @Param    pageSize  query  int     false  "page size"
+// @Param    search    query  string  false  "search term"
+// @Success  200  {object}  api.PaginatedContent[[]%[3]s]
+// @Router   /%[2]ss [get]
+func (h Handler) List(c *gin.Context) {
 	page := utils.Atoi(c.Query("page"), 1)
 	pageSize := utils.Atoi(c.Query("pageSize"), 20)
 	items, total, err := h.service.List(c.Request.Context(), Query{Page: page, PageSize: pageSize, Search: c.Query("search")})
@@ -689,7 +741,16 @@ func (h *Handler) list(c *gin.Context) {
 	})
 }
 
-func (h *Handler) create(c *gin.Context) {
+// Create godoc
+// @Summary  Create a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    body  body  exampleRequest  true  "payload"
+// @Success  201  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss [post]
+func (h Handler) Create(c *gin.Context) {
 	var req exampleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, http.StatusBadRequest, err.Error())
@@ -703,7 +764,15 @@ func (h *Handler) create(c *gin.Context) {
 	c.JSON(http.StatusCreated, api.APIResponse[%[3]s]{Success: true, Result: item})
 }
 
-func (h *Handler) get(c *gin.Context) {
+// Get godoc
+// @Summary  Get a %[3]s by id
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  404  {object}  api.APIError
+// @Router   /%[2]ss/{id} [get]
+func (h Handler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		fail(c, http.StatusBadRequest, "invalid id")
@@ -717,7 +786,17 @@ func (h *Handler) get(c *gin.Context) {
 	c.JSON(http.StatusOK, api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) update(c *gin.Context) {
+// Update godoc
+// @Summary  Update a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    id    path  string          true  "identifier"
+// @Param    body  body  map[string]any  true  "fields to update"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss/{id} [patch]
+func (h Handler) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		fail(c, http.StatusBadRequest, "invalid id")
@@ -736,7 +815,14 @@ func (h *Handler) update(c *gin.Context) {
 	c.JSON(http.StatusOK, api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) remove(c *gin.Context) {
+// Delete godoc
+// @Summary  Delete a %[3]s
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIMessage
+// @Router   /%[2]ss/{id} [delete]
+func (h Handler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		fail(c, http.StatusBadRequest, "invalid id")
@@ -769,13 +855,13 @@ import "github.com/gin-gonic/gin"
 
 // SetRoutes attaches the resource endpoints to the router group, applying any
 // group-scoped middleware passed by the caller.
-func SetRoutes(group *gin.RouterGroup, h *Handler, middlewares ...gin.HandlerFunc) {
+func SetRoutes(group *gin.RouterGroup, h Handler, middlewares ...gin.HandlerFunc) {
 	group.Use(middlewares...)
-	group.GET("", h.list)
-	group.POST("", h.create)
-	group.GET("/:id", h.get)
-	group.PATCH("/:id", h.update)
-	group.DELETE("/:id", h.remove)
+	group.GET("", h.List)
+	group.POST("", h.Create)
+	group.GET("/:id", h.Get)
+	group.PATCH("/:id", h.Update)
+	group.DELETE("/:id", h.Delete)
 }
 `, domain)
 }
@@ -799,8 +885,8 @@ type Handler struct {
 }
 
 // NewHandler builds a Handler over the %[3]s service.
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service) Handler {
+	return Handler{service: service}
 }
 
 type exampleRequest struct {
@@ -808,7 +894,16 @@ type exampleRequest struct {
 	Price float64 `+tick+`json:"price"`+tick+`
 }
 
-func (h *Handler) list(c echo.Context) error {
+// List godoc
+// @Summary  List %[3]s records
+// @Tags     %[2]s
+// @Produce  json
+// @Param    page      query  int     false  "page number"
+// @Param    pageSize  query  int     false  "page size"
+// @Param    search    query  string  false  "search term"
+// @Success  200  {object}  api.PaginatedContent[[]%[3]s]
+// @Router   /%[2]ss [get]
+func (h Handler) List(c echo.Context) error {
 	page := utils.Atoi(c.QueryParam("page"), 1)
 	pageSize := utils.Atoi(c.QueryParam("pageSize"), 20)
 	items, total, err := h.service.List(c.Request().Context(), Query{Page: page, PageSize: pageSize, Search: c.QueryParam("search")})
@@ -824,7 +919,16 @@ func (h *Handler) list(c echo.Context) error {
 	})
 }
 
-func (h *Handler) create(c echo.Context) error {
+// Create godoc
+// @Summary  Create a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    body  body  exampleRequest  true  "payload"
+// @Success  201  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss [post]
+func (h Handler) Create(c echo.Context) error {
 	var req exampleRequest
 	if err := c.Bind(&req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
@@ -836,7 +940,15 @@ func (h *Handler) create(c echo.Context) error {
 	return c.JSON(http.StatusCreated, api.APIResponse[%[3]s]{Success: true, Result: item})
 }
 
-func (h *Handler) get(c echo.Context) error {
+// Get godoc
+// @Summary  Get a %[3]s by id
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  404  {object}  api.APIError
+// @Router   /%[2]ss/{id} [get]
+func (h Handler) Get(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -848,7 +960,17 @@ func (h *Handler) get(c echo.Context) error {
 	return c.JSON(http.StatusOK, api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) update(c echo.Context) error {
+// Update godoc
+// @Summary  Update a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    id    path  string          true  "identifier"
+// @Param    body  body  map[string]any  true  "fields to update"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss/{id} [patch]
+func (h Handler) Update(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -864,7 +986,14 @@ func (h *Handler) update(c echo.Context) error {
 	return c.JSON(http.StatusOK, api.APIResponse[%[3]s]{Success: true, Result: *item})
 }
 
-func (h *Handler) remove(c echo.Context) error {
+// Delete godoc
+// @Summary  Delete a %[3]s
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIMessage
+// @Router   /%[2]ss/{id} [delete]
+func (h Handler) Delete(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return fail(c, http.StatusBadRequest, "invalid id")
@@ -895,13 +1024,13 @@ import "github.com/labstack/echo/v4"
 
 // SetRoutes attaches the resource endpoints to the router group, applying any
 // group-scoped middleware passed by the caller.
-func SetRoutes(group *echo.Group, h *Handler, middlewares ...echo.MiddlewareFunc) {
+func SetRoutes(group *echo.Group, h Handler, middlewares ...echo.MiddlewareFunc) {
 	group.Use(middlewares...)
-	group.GET("", h.list)
-	group.POST("", h.create)
-	group.GET("/:id", h.get)
-	group.PATCH("/:id", h.update)
-	group.DELETE("/:id", h.remove)
+	group.GET("", h.List)
+	group.POST("", h.Create)
+	group.GET("/:id", h.Get)
+	group.PATCH("/:id", h.Update)
+	group.DELETE("/:id", h.Delete)
 }
 `, domain)
 }
