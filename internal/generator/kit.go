@@ -7,11 +7,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	gokub "github.com/ongyoo/gokub"
 	"github.com/ongyoo/gokub/internal/agentskills"
 	"github.com/ongyoo/gokub/internal/manifest"
 )
+
+// requestTypeName returns the request DTO name for a domain type, e.g. Product
+// becomes productRequest.
+func requestTypeName(typeName string) string {
+	if typeName == "" {
+		return "request"
+	}
+	return strings.ToLower(typeName[:1]) + typeName[1:] + "Request"
+}
 
 // generateEncryptionKey returns a base64-encoded random 32-byte AES key.
 func generateEncryptionKey() string {
@@ -546,7 +556,13 @@ type Query struct {
 	PageSize int
 	Search   string
 }
-`, pkg, typeName)
+
+// %[3]s is the validated write payload for create and update handlers.
+type %[3]s struct {
+	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
+	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
+}
+`, pkg, typeName, requestTypeName(typeName))
 }
 
 func kitRepositoryFile(pkg, typeName string) string {

@@ -556,11 +556,6 @@ func NewHandler(service Service) Handler {
 	return Handler{service: service}
 }
 
-type exampleRequest struct {
-	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
-	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
-}
-
 // List godoc
 // @Summary  List %[3]s records
 // @Tags     %[2]s
@@ -591,12 +586,12 @@ func (h Handler) List(c fiber.Ctx) error {
 // @Tags     %[2]s
 // @Accept   json
 // @Produce  json
-// @Param    body  body  exampleRequest  true  "payload"
+// @Param    body  body  %[4]s  true  "payload"
 // @Success  201  {object}  api.APIResponse[%[3]s]
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss [post]
 func (h Handler) Create(c fiber.Ctx) error {
-	var req exampleRequest
+	var req %[4]s
 	if err := c.Bind().Body(&req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
 	}
@@ -684,7 +679,7 @@ func totalPages(total int64, pageSize int) int64 {
 	}
 	return (total + int64(pageSize) - 1) / int64(pageSize)
 }
-`, module, domain, typeName)
+`, module, domain, typeName, requestTypeName(typeName))
 }
 
 func kitFiberRouter(domain string) string {
@@ -731,11 +726,6 @@ func NewHandler(service Service) Handler {
 	return Handler{service: service}
 }
 
-type exampleRequest struct {
-	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
-	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
-}
-
 // List godoc
 // @Summary  List %[3]s records
 // @Tags     %[2]s
@@ -767,12 +757,12 @@ func (h Handler) List(c *gin.Context) {
 // @Tags     %[2]s
 // @Accept   json
 // @Produce  json
-// @Param    body  body  exampleRequest  true  "payload"
+// @Param    body  body  %[4]s  true  "payload"
 // @Success  201  {object}  api.APIResponse[%[3]s]
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss [post]
 func (h Handler) Create(c *gin.Context) {
-	var req exampleRequest
+	var req %[4]s
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, http.StatusBadRequest, err.Error())
 		return
@@ -870,7 +860,7 @@ func totalPages(total int64, pageSize int) int64 {
 	}
 	return (total + int64(pageSize) - 1) / int64(pageSize)
 }
-`, module, domain, typeName)
+`, module, domain, typeName, requestTypeName(typeName))
 }
 
 func kitGinRouter(domain string) string {
@@ -915,11 +905,6 @@ func NewHandler(service Service) Handler {
 	return Handler{service: service}
 }
 
-type exampleRequest struct {
-	Name  string  `+tick+`json:"name" validate:"required,min=2,max=120"`+tick+`
-	Price float64 `+tick+`json:"price" validate:"gte=0"`+tick+`
-}
-
 // List godoc
 // @Summary  List %[3]s records
 // @Tags     %[2]s
@@ -950,12 +935,12 @@ func (h Handler) List(c echo.Context) error {
 // @Tags     %[2]s
 // @Accept   json
 // @Produce  json
-// @Param    body  body  exampleRequest  true  "payload"
+// @Param    body  body  %[4]s  true  "payload"
 // @Success  201  {object}  api.APIResponse[%[3]s]
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss [post]
 func (h Handler) Create(c echo.Context) error {
-	var req exampleRequest
+	var req %[4]s
 	if err := c.Bind(&req); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
 	}
@@ -1043,7 +1028,7 @@ func totalPages(total int64, pageSize int) int64 {
 	}
 	return (total + int64(pageSize) - 1) / int64(pageSize)
 }
-`, module, domain, typeName)
+`, module, domain, typeName, requestTypeName(typeName))
 }
 
 func kitEchoRouter(domain string) string {
