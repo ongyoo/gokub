@@ -793,6 +793,16 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 	}
 	success(out, "created %s", name)
 	p := newPalette()
+	// On an interactive terminal, step into the new project and open the command
+	// center so the next action is one keypress away. (A child process cannot
+	// change the parent shell's directory, so this applies within GOKUB only.)
+	if inFile, ok := in.(*os.File); ok && terminalAvailable(inFile) {
+		if err := os.Chdir(name); err == nil {
+			fmt.Fprintf(out, "  %s %s\n", p.dim("entering project"), p.amber(name))
+			fmt.Fprintf(out, "  %s\n", p.dim("run 'cd "+name+"' in your shell to stay here after exit"))
+			return runCommandCenter(in, out, out)
+		}
+	}
 	fmt.Fprintf(out, "  %s\n  %s\n", p.dim("next:"), p.amber("cd "+name+" && go test ./..."))
 	return nil
 }
