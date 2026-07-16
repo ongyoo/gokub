@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +12,15 @@ import (
 	"github.com/ongyoo/gokub/internal/agentskills"
 	"github.com/ongyoo/gokub/internal/manifest"
 )
+
+// generateEncryptionKey returns a base64-encoded random 32-byte AES key.
+func generateEncryptionKey() string {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(key)
+}
 
 // tick returns a raw backtick for embedding Go struct tags in template strings.
 const tick = "`"
@@ -40,6 +51,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 	domain := "example"
 	typeName := "Example"
 	service := serviceName(m.Name)
+	encryptionKey := generateEncryptionKey()
 
 	target := filepath.Join(root, m.Name)
 	if _, err := os.Stat(target); err == nil {
@@ -54,6 +66,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"internal/app/events",
 		"internal/" + domain,
 		"pkg/api",
+		"pkg/crypto",
 		"pkg/database/postgresql",
 		"pkg/error",
 		"pkg/httpserver/" + m.Framework,
@@ -85,6 +98,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"internal/" + domain + "/handler.go":               kitHandlerFile(m.Module, m.Framework, domain, typeName),
 		"internal/" + domain + "/router.go":                kitRouterFile(m.Framework, domain),
 		"pkg/api/response.go":                              kitAPIResponseFile(),
+		"pkg/crypto/crypto.go":                             kitCryptoFile(),
 		"pkg/error/error.go":                               kitErrorFile(),
 		"pkg/database/postgresql/postgres.go":              kitPostgresFile(),
 		"pkg/utils/utils.go":                               kitUtilsFile(),
@@ -96,8 +110,8 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"Makefile":                                         kitMakefile(service),
 		"Dockerfile":                                       kitDockerfile(service, m.GoVersion),
 		"docker-compose.yml":                               kitComposeFile(m.Name),
-		".env.example":                                     kitEnvFile(m.Name, m.Messaging),
-		".env":                                             kitEnvFile(m.Name, m.Messaging),
+		".env.example":                                     kitEnvFile(m.Name, m.Messaging, ""),
+		".env":                                             kitEnvFile(m.Name, m.Messaging, encryptionKey),
 		".gitignore":                                       gitignore(),
 		".dockerignore":                                    dockerignore(),
 		".github/workflows/ci.yml":                         ciFile(ciGoVersion(m)),
@@ -846,6 +860,149 @@ func Open(dsn string) (*gorm.DB, error) {
 `
 }
 
+func kitCryptoFile() string {
+	return `package crypto
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"database/sql/driver"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"sync"
+)
+
+// EnvKey holds a base64-encoded 32-byte AES key used to encrypt values at rest.
+const EnvKey = "APP_ENCRYPTION_KEY"
+
+var (
+	loadOnce sync.Once
+	aead     cipher.AEAD
+	loadErr  error
+)
+
+func cipherAEAD() (cipher.AEAD, error) {
+	loadOnce.Do(func() {
+		raw := os.Getenv(EnvKey)
+		if raw == "" {
+			loadErr = fmt.Errorf("%s is not set", EnvKey)
+			return
+		}
+		key, err := base64.StdEncoding.DecodeString(raw)
+		if err != nil {
+			loadErr = fmt.Errorf("decode %s: %w", EnvKey, err)
+			return
+		}
+		if len(key) != 32 {
+			loadErr = fmt.Errorf("%s must decode to 32 bytes, got %d", EnvKey, len(key))
+			return
+		}
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			loadErr = err
+			return
+		}
+		aead, loadErr = cipher.NewGCM(block)
+	})
+	return aead, loadErr
+}
+
+// Encrypt returns a base64 AES-256-GCM ciphertext for plaintext.
+func Encrypt(plaintext string) (string, error) {
+	gcm, err := cipherAEAD()
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	sealed := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	return base64.StdEncoding.EncodeToString(sealed), nil
+}
+
+// Decrypt reverses Encrypt.
+func Decrypt(ciphertext string) (string, error) {
+	gcm, err := cipherAEAD()
+	if err != nil {
+		return "", err
+	}
+	raw, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return "", err
+	}
+	if len(raw) < gcm.NonceSize() {
+		return "", errors.New("ciphertext too short")
+	}
+	nonce, body := raw[:gcm.NonceSize()], raw[gcm.NonceSize():]
+	plain, err := gcm.Open(nil, nonce, body, nil)
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
+}
+
+// GenerateKey returns a base64-encoded random 32-byte key for ` + "`" + `APP_ENCRYPTION_KEY` + "`" + `.
+func GenerateKey() (string, error) {
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(key), nil
+}
+
+// Secret is a string that is transparently encrypted at rest. Use it as a gorm
+// column type for sensitive values (tokens, API keys, personal data):
+//
+//	type Account struct {
+//	    APIKey crypto.Secret ` + "`" + `gorm:"type:text"` + "`" + `
+//	}
+type Secret string
+
+// Value encrypts the secret for storage (database/sql/driver.Valuer).
+func (s Secret) Value() (driver.Value, error) {
+	if s == "" {
+		return "", nil
+	}
+	return Encrypt(string(s))
+}
+
+// Scan decrypts a stored secret (sql.Scanner).
+func (s *Secret) Scan(value any) error {
+	if value == nil {
+		*s = ""
+		return nil
+	}
+	var enc string
+	switch v := value.(type) {
+	case string:
+		enc = v
+	case []byte:
+		enc = string(v)
+	default:
+		return fmt.Errorf("unsupported Secret source %T", value)
+	}
+	if enc == "" {
+		*s = ""
+		return nil
+	}
+	plain, err := Decrypt(enc)
+	if err != nil {
+		return err
+	}
+	*s = Secret(plain)
+	return nil
+}
+
+// String returns the plaintext value.
+func (s Secret) String() string { return string(s) }
+`
+}
+
 func kitUtilsFile() string {
 	return `package utils
 
@@ -943,13 +1100,17 @@ func kitComposeFile(name string) string {
 `, name)
 }
 
-func kitEnvFile(name, messaging string) string {
+func kitEnvFile(name, messaging, encryptionKey string) string {
+	if encryptionKey == "" {
+		encryptionKey = "replace-with-a-base64-encoded-32-byte-key"
+	}
 	base := fmt.Sprintf(`# %s
 APP_ENV=local
 PORT=8080
 LOG_LEVEL=debug
 DATABASE_URL=postgres://app:app@localhost:5432/app?sslmode=disable
-`, name)
+APP_ENCRYPTION_KEY=%s
+`, name, encryptionKey)
 	switch messaging {
 	case "rabbitmq":
 		base += "RABBITMQ_URL=amqp://guest:guest@localhost:5672/\nRABBITMQ_EXCHANGE=events\n"
@@ -1036,6 +1197,7 @@ config/            environment configuration
 internal/%s/       domain: model, repository, service, handler, router
 internal/app/      composition and event contracts
 pkg/api/           response envelopes
+pkg/crypto/        AES-256-GCM helpers and encrypted Secret column type
 pkg/database/      gorm database adapters
 pkg/error/         typed domain errors
 pkg/httpserver/    framework server bootstrap and graceful shutdown
