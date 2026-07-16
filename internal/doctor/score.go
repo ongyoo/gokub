@@ -40,7 +40,7 @@ func Score(root string) ScoreReport {
 			scoreCheck("Valid GOKUB manifest", manifestOK, "Run gokub doctor and repair .gokub.yaml."),
 			scoreCheck("Matching Go module", manifestOK && fileHas(filepath.Join(root, "go.mod"), "module "+m.Module), "Set the go.mod module path to match .gokub.yaml."),
 			scoreCheck("Application entrypoint", treeHas(root, "cmd", func(path string) bool { return filepath.Base(path) == "main.go" }), "Add a cmd/<service>/main.go composition root."),
-			scoreCheck("Architecture boundaries", isDir(filepath.Join(root, "internal", "domain")) && isDir(filepath.Join(root, "internal", "platform")), "Keep business rules under internal/domain and adapters under internal/platform."),
+			scoreCheck("Architecture boundaries", isDir(filepath.Join(root, "internal", "app")) && isDir(filepath.Join(root, "pkg")), "Keep composition under internal/app and shared adapters under pkg."),
 			scoreCheck("Clean dependencies", cleanDependencies(root), "Run gokub graph --check and move outward dependencies behind domain interfaces."),
 		),
 		category("Security",
@@ -62,7 +62,7 @@ func Score(root string) ScoreReport {
 			scoreCheck("Deployment assets", isDir(filepath.Join(root, "deployments")) || isFile(filepath.Join(root, "docker-compose.yml")), "Add deployment or local orchestration assets."),
 			scoreCheck("Health endpoint", goTreeHas(root, "/health/live"), "Expose a liveness endpoint at /health/live."),
 			scoreCheck("Graceful shutdown", goTreeHas(root, "signal.NotifyContext"), "Handle SIGINT and SIGTERM with graceful shutdown."),
-			scoreCheck("Structured logging", goTreeHas(root, "log/slog"), "Use structured logging for operational events."),
+			scoreCheck("Structured logging", goTreeHas(root, "log/slog") || goTreeHas(root, "sirupsen/logrus"), "Use structured logging for operational events."),
 		),
 	}
 	report := ScoreReport{Max: len(categories) * 5 * pointsPerCheck, Categories: categories}

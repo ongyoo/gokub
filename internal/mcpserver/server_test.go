@@ -85,6 +85,7 @@ func TestServeRejectsUnsafeCRUDName(t *testing.T) {
 }
 
 func TestServeGeneratesModelFromProjectJSON(t *testing.T) {
+	t.Setenv("GOKUB_SKIP_INSTALL", "1")
 	root := t.TempDir()
 	m := manifest.New("example-api", "github.com/example/example-api")
 	if err := generator.NewProject(root, m); err != nil {
@@ -103,7 +104,7 @@ func TestServeGeneratesModelFromProjectJSON(t *testing.T) {
 	if !strings.Contains(output.String(), `"isError":false`) {
 		t.Fatalf("model tool failed: %s", output.String())
 	}
-	if _, err := os.Stat(filepath.Join(project, "internal", "domain", "user", "model_gen.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(project, "internal", "user", "model_gen.go")); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -98,13 +98,31 @@ func runCommandCenter(in io.Reader, out, errOut io.Writer) error {
 		usage(out)
 		return nil
 	}
-	_, projectErr := os.Stat(manifest.FileName)
-	inProject := projectErr == nil
-	actions := commandCenterActions(inProject)
-	selected := newPrompter(in, out, 1).choice("Choose workflow", actions, actions[0])
+	palette := newPalette()
+	for {
+		_, projectErr := os.Stat(manifest.FileName)
+		inProject := projectErr == nil
+		actions := commandCenterActions(inProject)
+		selected := newPrompter(in, out, 1).choice("Choose workflow", actions, actions[0])
+		exit, err := runCommandCenterAction(selected, in, out, errOut)
+		if err != nil {
+			fmt.Fprintf(out, "  %s %v\n", palette.fail("error:"), err)
+		}
+		if exit {
+			return nil
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// runCommandCenterAction runs one menu selection. It returns exit=true when the
+// command center should stop: after a project is created or a feature is added,
+// or when the user chooses Exit. Read-only actions return exit=false so the menu
+// keeps looping and stays ready for the next command.
+func runCommandCenterAction(selected string, in io.Reader, out, errOut io.Writer) (bool, error) {
 	switch selected {
 	case "New project":
-		return runNew(nil, in, out)
+		return true, runNew(nil, in, out)
 	case "Add feature":
 		feature := newPrompter(in, out, 1).choice("Feature", catalog.FeatureNames(), "auth")
 		name := ""
@@ -115,53 +133,58 @@ func runCommandCenter(in io.Reader, out, errOut io.Writer) error {
 		if name != "" {
 			args = append(args, name)
 		}
-		return runAdd(args, in, out)
+		return true, runAdd(args, in, out)
 	case "Generate model from JSON":
-		return runAdd([]string{"model"}, in, out)
+		return true, runAdd([]string{"model"}, in, out)
 	case "Project status":
-		return runStatus(nil, out)
+		return false, runStatus(nil, out)
 	case "Doctor":
-		return runDoctor(nil, out)
+		return false, runDoctor(nil, out)
 	case "Project score":
-		return runScore(nil, out)
+		return false, runScore(nil, out)
 	case "Dependency graph":
-		return runGraph(nil, out)
+		return false, runGraph(nil, out)
 	case "Upgrade project":
-		return runUpgrade(nil, in, out)
+		return false, runUpgrade(nil, in, out)
 	case "Community templates":
 		operation := newPrompter(in, out, 1).choice("Template workflow", []string{"Search and install", "List installed", "Add local folder"}, "Search and install")
 		switch operation {
 		case "Search and install":
 			query := newPrompter(in, out, 1).ask("Search", "api")
-			return runTemplate([]string{"search", query, "--install"}, in, out)
+			return false, runTemplate([]string{"search", query, "--install"}, in, out)
 		case "Add local folder":
 			path := newPrompter(in, out, 1).ask("Template folder", "./template")
-			return runTemplate([]string{"add", path}, in, out)
+			return false, runTemplate([]string{"add", path}, in, out)
 		default:
-			return runTemplate([]string{"list"}, in, out)
+			return false, runTemplate([]string{"list"}, in, out)
 		}
 	case "Plugins":
-		return runPlugin([]string{"list"}, in, out, errOut)
+		return false, runPlugin([]string{"list"}, in, out, errOut)
 	case "Agent skills":
-		return runSkill([]string{"list"}, out)
+		return false, runSkill([]string{"list"}, out)
 	case "Update CLI":
-		return runUpdate(nil, in, out)
+		return false, runUpdate(nil, in, out)
 	case "Install shell completion":
-		return runCompletion([]string{"install"}, out)
+		return false, runCompletion([]string{"install"}, out)
+	case "Help":
+		help(nil, out)
+		return false, nil
+	case "Exit":
+		return true, nil
 	default:
 		usage(out)
-		return nil
+		return true, nil
 	}
 }
 
 func commandCenterActions(inProject bool) []string {
 	if !inProject {
-		return []string{"New project", "Community templates", "Plugins", "Install shell completion", "Update CLI", "Help"}
+		return []string{"New project", "Community templates", "Plugins", "Install shell completion", "Update CLI", "Help", "Exit"}
 	}
 	return []string{
 		"Add feature", "Generate model from JSON", "Project status", "Doctor",
 		"Project score", "Dependency graph", "Upgrade project", "Community templates",
-		"Plugins", "Agent skills", "Install shell completion", "Update CLI", "New project", "Help",
+		"Plugins", "Agent skills", "Install shell completion", "Update CLI", "New project", "Help", "Exit",
 	}
 }
 
@@ -689,7 +712,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 		*template = prompts.choice("Template", templateOptions, *template)
 	}
 	if wizard && !setFlags["framework"] {
-		*framework = prompts.choice("Framework", []string{"gin", "fiber", "grpc", "none"}, *framework)
+		*framework = prompts.choice("Framework", []string{"gin", "fiber", "echo"}, *framework)
 	}
 	if wizard && !setFlags["database"] {
 		*database = prompts.choice("Database", []string{"postgres", "mongodb", "none"}, *database)
@@ -757,7 +780,9 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 		return err
 	}
 	for _, feature := range m.Features {
-		if (m.Template == "monolith" || m.Template == "microservices") && standardTemplateFeature(feature) {
+		// The kit generator already provides database, HTTP, messaging, and CI
+		// wiring, so skip standalone infrastructure scaffolds during creation.
+		if standardTemplateFeature(feature) {
 			continue
 		}
 		if err := generator.AddFeature(name, feature, ""); err != nil {
@@ -783,7 +808,7 @@ func validateProjectOptions(m manifest.Manifest) error {
 	}
 	allowed := map[string][]string{
 		"style":        {"monolith", "microservices"},
-		"framework":    {"gin", "fiber", "grpc", "none"},
+		"framework":    {"gin", "fiber", "echo"},
 		"database":     {"postgres", "mongodb", "none"},
 		"architecture": {"clean", "hexagonal", "layered"},
 		"messaging":    {"none", "kafka", "rabbitmq", "nats"},
@@ -837,6 +862,9 @@ func runAdd(args []string, in io.Reader, out io.Writer) error {
 	manifest.AddFeature(&m, record)
 	if err := manifest.Write(manifest.FileName, m); err != nil {
 		return err
+	}
+	if err := generator.TidyModule("."); err != nil {
+		return fmt.Errorf("resolve dependencies: %w", err)
 	}
 	success(out, "added %s", record)
 	return nil
@@ -1023,6 +1051,7 @@ func runDisable(args []string, out io.Writer) error {
 	case "messaging":
 		if len(args) == 1 || contains(remove, m.Messaging) {
 			m.Messaging = "none"
+			generator.UnwireMessaging(".")
 		}
 	case "database":
 		if len(args) == 1 || contains(remove, m.Database) {
@@ -1105,6 +1134,11 @@ func applyCapabilityProvider(root, capabilityName, provider string, replace bool
 	if err := manifest.Write(filepath.Join(root, manifest.FileName), m); err != nil {
 		return err
 	}
+	if capabilityName == "messaging" {
+		if err := generator.TidyModule(root); err != nil {
+			return fmt.Errorf("resolve dependencies: %w", err)
+		}
+	}
 	action := "enabled"
 	if replace {
 		action = "switched"
@@ -1177,6 +1211,9 @@ func runRecipe(args []string, out io.Writer) error {
 	manifest.AddRecipe(&m, recipe.Name)
 	if err := manifest.Write(manifest.FileName, m); err != nil {
 		return err
+	}
+	if err := generator.TidyModule("."); err != nil {
+		return fmt.Errorf("resolve dependencies: %w", err)
 	}
 	success(out, "applied recipe %s", recipe.Name)
 	return nil

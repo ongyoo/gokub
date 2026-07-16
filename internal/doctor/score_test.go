@@ -17,16 +17,17 @@ func TestScoreCompleteProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"go.mod":                                "module example.com/service\n",
-		"cmd/service/main.go":                   "package main\n// signal.NotifyContext log/slog\n",
-		"internal/http/server.go":               "package http\n// /health/live X-Content-Type-Options\n",
-		"internal/domain/example/model.go":      "package example\n",
-		"internal/platform/postgres/store.go":   "package postgres\n",
-		"internal/domain/example/model_test.go": "package example\n",
-		".env.example":                          "PORT=8080\n",
-		".gitignore":                            ".env\n",
-		"Dockerfile":                            "FROM scratch\nUSER 65532\n",
-		".github/workflows/ci.yml":              "go vet ./...\ngo test -race ./...\n",
+		"go.mod":                           "module example.com/service\n",
+		"cmd/service/main.go":              "package main\n// signal.NotifyContext log/slog /health/live X-Content-Type-Options\n",
+		"internal/app/app.go":              "package app\n",
+		"internal/example/service.go":      "package example\n",
+		"internal/example/service_test.go": "package example\n",
+		"pkg/api/response.go":              "package api\n",
+		".env.example":                     "PORT=8080\n",
+		".gitignore":                       ".env\n",
+		"docker-compose.yml":               "services: {}\n",
+		"Dockerfile":                       "FROM scratch\nUSER 65532\n",
+		".github/workflows/ci.yml":         "go vet ./...\ngo test -race ./...\n",
 	}
 	for path, content := range files {
 		writeScoreFixture(t, root, path, content)

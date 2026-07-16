@@ -42,7 +42,7 @@ func Analyze(root string) Report {
 
 func Check(root string) []Result {
 	checks := []Result{}
-	requiredDirs := []string{"cmd", "internal", "configs", "deployments", "docs", "scripts", "tests", "migrations"}
+	requiredDirs := []string{"cmd", "internal", "pkg", "config", "docs", "tests"}
 	for _, dir := range requiredDirs {
 		checks = append(checks, exists(filepath.Join(root, dir), "directory "+dir))
 	}
@@ -64,7 +64,7 @@ func Check(root string) []Result {
 			checks = append(checks, fileContains(filepath.Join(root, "go.mod"), "go "+m.GoVersion, "Go version"))
 			checks = append(checks, Result{Name: "Go version policy", OK: true, Info: "Go " + m.GoVersion + ": " + goversion.Description(m.GoVersion)})
 		}
-		checks = append(checks, exists(filepath.Join(root, "cmd", m.Name, "main.go"), "service entrypoint"))
+		checks = append(checks, exists(filepath.Join(root, "cmd", m.Name+"-service", "main.go"), "service entrypoint"))
 		checks = append(checks, exists(filepath.Join(root, ".env.example"), "environment example"))
 		checks = append(checks, exists(filepath.Join(root, ".codex", "config.toml"), "Codex MCP config"))
 		checks = append(checks, exists(filepath.Join(root, ".mcp.json"), "MCP client config"))

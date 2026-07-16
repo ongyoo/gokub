@@ -2,7 +2,9 @@ dist/
 *.log
 .env
 .DS_Store
+.claude/
 .gocache/
 example-project/
+exsample-project/
 spec.md
 vscode-extension/node_modules/
