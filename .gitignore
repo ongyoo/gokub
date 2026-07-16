@@ -5,5 +5,6 @@ dist/
 .claude/
 .gocache/
 example-project/
+exsample-project/
 spec.md
 vscode-extension/node_modules/
