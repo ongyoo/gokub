@@ -17,6 +17,7 @@ import (
 )
 
 func TestNewParsesFlagsAfterProjectName(t *testing.T) {
+	t.Setenv("GOKUB_SKIP_INSTALL", "1")
 	temp := t.TempDir()
 	previous, err := os.Getwd()
 	if err != nil {
@@ -58,7 +59,10 @@ func TestNewParsesFlagsAfterProjectName(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(temp, "payment-api", "CLAUDE.md")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "postgres", "postgres.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "cmd", "payment-api-service", "main.go")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "example", "service.go")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(temp, "payment-api", ".vscode", "launch.json")); err != nil {
@@ -130,6 +134,7 @@ func TestCommandCenterActionsAreProjectAware(t *testing.T) {
 }
 
 func TestNewScaffoldsSelectedProviders(t *testing.T) {
+	t.Setenv("GOKUB_SKIP_INSTALL", "1")
 	temp := t.TempDir()
 	previous, err := os.Getwd()
 	if err != nil {
@@ -141,11 +146,16 @@ func TestNewScaffoldsSelectedProviders(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(previous) })
 
 	var out bytes.Buffer
-	err = Run([]string{"new", "events", "--database", "mongodb", "--messaging", "nats"}, bytes.NewBuffer(nil), &out, &out)
+	err = Run([]string{"new", "events", "--framework", "fiber", "--database", "mongodb", "--messaging", "nats"}, bytes.NewBuffer(nil), &out, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"internal/mongodb/mongodb.go", "internal/nats/nats.go"} {
+	for _, path := range []string{
+		"cmd/events-service/main.go",
+		"internal/example/service.go",
+		"pkg/httpserver/fiber/http.go",
+		"pkg/middleware/fiber/middleware.go",
+	} {
 		if _, err := os.Stat(filepath.Join(temp, "events", path)); err != nil {
 			t.Fatal(err)
 		}
@@ -193,10 +203,10 @@ func TestNewWizardCreatesProjectFromStepAnswers(t *testing.T) {
 		t.Fatalf("unexpected go.mod:\n%s", goMod)
 	}
 
-	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "platform", "messaging", "kafka", "kafka.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "cmd", "payment-api-service", "main.go")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "outbox", "outbox.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "example", "router.go")); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -234,6 +244,7 @@ func TestNewWizardUsesExampleAPIDefault(t *testing.T) {
 }
 
 func TestEnableAndSwitchCapabilityProvider(t *testing.T) {
+	t.Setenv("GOKUB_SKIP_INSTALL", "1")
 	temp := t.TempDir()
 	previous, err := os.Getwd()
 	if err != nil {
@@ -256,14 +267,17 @@ func TestEnableAndSwitchCapabilityProvider(t *testing.T) {
 	if err := Run([]string{"enable", "messaging", "kafka"}, bytes.NewBuffer(nil), &out, &out); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "kafka", "kafka.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "app", "events", "bus_kafka.go")); err != nil {
 		t.Fatal(err)
 	}
 	if err := Run([]string{"switch", "messaging", "rabbitmq"}, bytes.NewBuffer(nil), &out, &out); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "rabbitmq", "rabbitmq.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "app", "events", "bus_rabbitmq.go")); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "internal", "app", "events", "bus_kafka.go")); err == nil {
+		t.Fatal("switch did not remove the previous kafka bus file")
 	}
 	content, err := os.ReadFile(filepath.Join(temp, "payment-api", ".gokub.yaml"))
 	if err != nil {
