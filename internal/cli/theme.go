@@ -4,7 +4,57 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
+	"time"
 )
+
+// spinner is a lightweight terminal loading indicator used while GOKUB works.
+type spinner struct {
+	stop chan struct{}
+	done chan struct{}
+	once sync.Once
+}
+
+// startSpinner animates a labeled loading indicator on a terminal. When out is
+// not an interactive terminal it does nothing, so scripted and CI output stays
+// clean.
+func startSpinner(out io.Writer, file *os.File, label string) *spinner {
+	s := &spinner{stop: make(chan struct{}), done: make(chan struct{})}
+	if file == nil || !terminalAvailable(file) {
+		close(s.done)
+		return s
+	}
+	go func() {
+		defer close(s.done)
+		p := newPalette()
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		fmt.Fprint(out, "\x1b[?25l") // hide cursor
+		for i := 0; ; i++ {
+			select {
+			case <-s.stop:
+				fmt.Fprint(out, "\r\x1b[K\x1b[?25h") // clear line, restore cursor
+				return
+			default:
+				fmt.Fprintf(out, "\r  %s %s %s", p.cyan(frames[i%len(frames)]), p.amber("GoKub"), p.dim(label))
+				time.Sleep(90 * time.Millisecond)
+			}
+		}
+	}()
+	return s
+}
+
+// Stop ends the animation and clears the line. Safe to call once.
+func (s *spinner) Stop() {
+	s.once.Do(func() {
+		select {
+		case <-s.done:
+			return
+		default:
+			close(s.stop)
+			<-s.done
+		}
+	})
+}
 
 type palette struct {
 	enabled bool

@@ -32,6 +32,7 @@ type Manifest struct {
 	Database         string
 	Architecture     string
 	Messaging        string
+	Agents           string
 	Recipes          []string
 	Features         []string
 }
@@ -51,6 +52,7 @@ func New(name, module string) Manifest {
 		Database:      "postgres",
 		Architecture:  "clean",
 		Messaging:     "none",
+		Agents:        "all",
 		Features:      []string{"docker", "github-actions"},
 		Recipes:       []string{},
 	}
@@ -148,10 +150,15 @@ func Read(path string) (Manifest, error) {
 			m.Architecture = value
 		case "messaging":
 			m.Messaging = value
+		case "agents":
+			m.Agents = value
 		}
 	}
 	if m.Style == "" {
 		m.Style = "monolith"
+	}
+	if m.Agents == "" {
+		m.Agents = "all"
 	}
 	return m, scanner.Err()
 }
@@ -179,6 +186,9 @@ func Write(path string, m Manifest) error {
 	fmt.Fprintf(content, "  style: %s\n", m.Style)
 	fmt.Fprintf(content, "  framework: %s\n", m.Framework)
 	fmt.Fprintf(content, "  architecture: %s\n", m.Architecture)
+	if m.Agents != "" {
+		fmt.Fprintf(content, "  agents: %s\n", m.Agents)
+	}
 	fmt.Fprintf(content, "database: %s\n", m.Database)
 	fmt.Fprintf(content, "messaging: %s\n", m.Messaging)
 	fmt.Fprintln(content, "security: asvs-l2")

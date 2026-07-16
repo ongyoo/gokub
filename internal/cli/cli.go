@@ -665,6 +665,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 	database := fs.String("database", "postgres", "database")
 	architecture := fs.String("architecture", "clean", "architecture")
 	messaging := fs.String("messaging", "none", "messaging provider")
+	agents := fs.String("agents", "all", "AI coding assistants: all|codex|claude|copilot|gemini|none")
 	recipe := fs.String("recipe", "", "recipe to apply")
 	module := fs.String("module", "", "Go module path")
 	goVersion := fs.String("go-version", goversion.Recommended, "Go language version (major.minor)")
@@ -727,6 +728,9 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 	if wizard && !setFlags["messaging"] {
 		*messaging = prompts.choice("Messaging", []string{"none", "kafka", "rabbitmq", "nats"}, *messaging)
 	}
+	if wizard && !setFlags["agents"] {
+		*agents = prompts.choice("Vibe coding assistants", []string{"all", "codex", "claude", "copilot", "gemini", "none"}, *agents)
+	}
 	if wizard && !setFlags["recipe"] {
 		*recipe = prompts.choice("Recipe", append([]string{"none"}, catalog.RecipeNames()...), "none")
 		if *recipe == "none" {
@@ -748,6 +752,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 	m.Database = *database
 	m.Architecture = *architecture
 	m.Messaging = *messaging
+	m.Agents = *agents
 	if err := validateProjectOptions(m); err != nil {
 		return err
 	}
@@ -776,11 +781,14 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 		}
 	}
 
-	if wizard {
-		p := newPalette()
-		fmt.Fprintln(out, p.dim("Generating project files..."))
+	var genFile *os.File
+	if f, ok := out.(*os.File); ok {
+		genFile = f
 	}
-	if err := generator.NewProject(".", m); err != nil {
+	spin := startSpinner(out, genFile, "generating project…")
+	err := generator.NewProject(".", m)
+	spin.Stop()
+	if err != nil {
 		return err
 	}
 	for _, feature := range m.Features {
@@ -816,10 +824,11 @@ func validateProjectOptions(m manifest.Manifest) error {
 		"database":     {"postgres", "mongodb", "none"},
 		"architecture": {"clean", "hexagonal", "layered"},
 		"messaging":    {"none", "kafka", "rabbitmq", "nats"},
+		"agents":       {"all", "codex", "claude", "copilot", "gemini", "none"},
 	}
 	values := map[string]string{
 		"style": m.Style, "framework": m.Framework, "database": m.Database,
-		"architecture": m.Architecture, "messaging": m.Messaging,
+		"architecture": m.Architecture, "messaging": m.Messaging, "agents": m.Agents,
 	}
 	for field, options := range allowed {
 		if !contains(options, values[field]) {
@@ -1733,7 +1742,7 @@ func newWizardTotal(wizard bool, argCount int, positionalName string, module str
 	if module == "" {
 		total++
 	}
-	for _, name := range []string{"go-version", "style", "template", "framework", "database", "architecture", "messaging", "recipe"} {
+	for _, name := range []string{"go-version", "style", "template", "framework", "database", "architecture", "messaging", "agents", "recipe"} {
 		if !setFlags[name] {
 			total++
 		}
@@ -1757,6 +1766,7 @@ func renderProjectSummary(out io.Writer, m manifest.Manifest, recipe string) {
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("database    "), pal.silver(m.Database))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("architecture"), pal.silver(m.Architecture))
 	fmt.Fprintf(out, "  %s %s\n", pal.dim("messaging   "), pal.silver(m.Messaging))
+	fmt.Fprintf(out, "  %s %s\n", pal.dim("vibe coding "), pal.silver(m.Agents))
 	fmt.Fprintf(out, "  %s %s\n\n", pal.dim("recipe      "), pal.amber(recipe))
 }
 
@@ -1852,6 +1862,7 @@ func help(args []string, out io.Writer) {
 		commandLine(out, "--database <name>", "database provider, default postgres")
 		commandLine(out, "--architecture <name>", "architecture style, default clean")
 		commandLine(out, "--messaging <name>", "messaging provider, default none")
+		commandLine(out, "--agents <name>", "AI assistants: all|codex|claude|copilot|gemini|none")
 		commandLine(out, "--recipe <name>", "apply a recipe during creation")
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, p.silver("Examples"))

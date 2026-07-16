@@ -100,14 +100,13 @@ func newKitProject(root string, m manifest.Manifest) error {
 		".env":                                             kitEnvFile(m.Name, m.Messaging),
 		".gitignore":                                       gitignore(),
 		".dockerignore":                                    dockerignore(),
-		"AGENTS.md":                                        agentsFile(m),
-		"CLAUDE.md":                                        claudeFile(m),
 		".github/workflows/ci.yml":                         ciFile(ciGoVersion(m)),
 		".vscode/launch.json":                              kitVSCodeFile(service),
 		".vscode/tasks.json":                               vscodeTasksFile(),
 		".run/GOKUB.run.xml":                               kitJetBrainsFile(m, service),
-		".codex/config.toml":                               codexConfigFile(),
-		".mcp.json":                                        mcpConfigFile(),
+	}
+	for name, content := range agentFilesFor(m) {
+		files[name] = content
 	}
 	for name, content := range files {
 		if err := writeNew(filepath.Join(target, name), content); err != nil {
@@ -120,8 +119,10 @@ func newKitProject(root string, m manifest.Manifest) error {
 			return err
 		}
 	}
-	if _, err := agentskills.Install(target, "all", false); err != nil {
-		return err
+	if provider := agentProvider(m); provider != "none" {
+		if _, err := agentskills.Install(target, provider, false); err != nil {
+			return err
+		}
 	}
 	if err := manifest.Write(filepath.Join(target, manifest.FileName), m); err != nil {
 		return err
@@ -147,6 +148,38 @@ func TidyModule(root string) error {
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	return command.Run()
+}
+
+// agentProvider returns the AI-agent provider to install, defaulting to all.
+func agentProvider(m manifest.Manifest) string {
+	if m.Agents == "" {
+		return "all"
+	}
+	return m.Agents
+}
+
+// agentFilesFor returns the top-level AI guidance files to write for the chosen
+// provider. Skill files are installed separately via agentskills.
+func agentFilesFor(m manifest.Manifest) map[string]string {
+	files := map[string]string{}
+	switch agentProvider(m) {
+	case "none":
+		// no AI guidance files
+	case "codex":
+		files["AGENTS.md"] = agentsFile(m)
+		files[".codex/config.toml"] = codexConfigFile()
+	case "claude":
+		files["CLAUDE.md"] = claudeFile(m)
+		files[".mcp.json"] = mcpConfigFile()
+	case "copilot", "gemini":
+		// instruction and skill files are installed via agentskills
+	default: // all
+		files["AGENTS.md"] = agentsFile(m)
+		files["CLAUDE.md"] = claudeFile(m)
+		files[".codex/config.toml"] = codexConfigFile()
+		files[".mcp.json"] = mcpConfigFile()
+	}
+	return files
 }
 
 func kitConfigFile() string {
