@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Build a solid Go service without rebuilding the foundation.</strong><br>
-  Guided setup, clean architecture, production defaults, and AI-ready workflows.
+  Guided setup, domain-focused architecture, production defaults, and AI-ready workflows.
 </p>
 
 <p align="center">
@@ -15,9 +15,19 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-00bfe8.svg" alt="MIT license"></a>
 </p>
 
-GOKUB creates Go applications through a friendly terminal wizard. Pick a project
-style, framework, database, messaging provider, and Go version; GOKUB generates
-ordinary Go code that your team fully owns.
+GOKUB creates Go applications through a friendly terminal wizard. Pick an HTTP
+framework (Gin, Fiber, or Echo), database, messaging provider, and Go version;
+GOKUB generates ordinary Go code that your team fully owns.
+
+Every service follows the same production layout:
+
+```text
+cmd/<name>-service/   entrypoint and wiring
+config/               environment configuration (envconfig)
+internal/<domain>/    model, repository, service, handler, router
+internal/app/         composition and event contracts
+pkg/                  api, database (gorm), error, httpserver, middleware, utils
+```
 
 ```text
 You choose                         GOKUB prepares
@@ -119,8 +129,7 @@ gokub help add
 
 ## Templates That Fit Your Team
 
-Use the included `monolith` or `microservices` foundation, a focused template such
-as `gin-clean`, `fiber-clean`, `worker`, or `grpc-service`, or import any local
+Choose the HTTP framework with `--framework gin|fiber|echo`, or import any local
 project folder as a reusable team template:
 
 ```bash
