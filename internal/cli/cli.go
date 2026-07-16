@@ -128,9 +128,14 @@ func runCommandCenterAction(selected string, in io.Reader, out, errOut io.Writer
 	case "New project":
 		return true, runNew(nil, in, out)
 	case "Add feature":
-		feature := newPrompter(in, out, 1).choice("Feature", catalog.FeatureNames(), "auth")
+		options := append([]string{"custom module"}, catalog.FeatureNames()...)
+		feature := newPrompter(in, out, 1).choice("Feature", options, "custom module")
 		name := ""
-		if feature == "crud" {
+		switch feature {
+		case "custom module":
+			feature = "crud"
+			name = newPrompter(in, out, 1).ask("Module name", "product")
+		case "crud":
 			name = newPrompter(in, out, 1).ask("Resource name", "product")
 		}
 		args := []string{feature}
@@ -853,6 +858,13 @@ func runAdd(args []string, in io.Reader, out io.Writer) error {
 	feature := args[0]
 	if feature == "model" {
 		return runAddModel(args[1:], in, out)
+	}
+	// `custom` generates a named domain module (the CRUD five-file scaffold).
+	if feature == "custom" {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: gokub add custom <name>")
+		}
+		feature = "crud"
 	}
 	if !catalog.HasFeature(feature) {
 		return fmt.Errorf("unknown feature %q", feature)
