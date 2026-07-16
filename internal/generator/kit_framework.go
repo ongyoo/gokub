@@ -101,7 +101,7 @@ func main() {
 	server.App.Get("/health/ready", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"status": "ok"}) })
 
 	api := server.App.Group("/api")
-	%[2]s.RegisterRoutes(api.Group("/%[2]ss"), handler)
+	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
 
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
@@ -149,7 +149,7 @@ func main() {
 	server.Router.GET("/health/ready", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 
 	api := server.Router.Group("/api")
-	%[2]s.RegisterRoutes(api.Group("/%[2]ss"), handler)
+	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
 
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
@@ -197,7 +197,7 @@ func main() {
 	server.Echo.GET("/health/ready", func(c echo.Context) error { return c.JSON(http.StatusOK, map[string]string{"status": "ok"}) })
 
 	api := server.Echo.Group("/api")
-	%[2]s.RegisterRoutes(api.Group("/%[2]ss"), handler)
+	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
 
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
@@ -629,8 +629,12 @@ func kitFiberRouter(domain string) string {
 
 import "github.com/gofiber/fiber/v3"
 
-// RegisterRoutes attaches the resource endpoints to the router group.
-func RegisterRoutes(router fiber.Router, h *Handler) {
+// SetRoutes attaches the resource endpoints to the router group, applying any
+// group-scoped middleware passed by the caller.
+func SetRoutes(router fiber.Router, h *Handler, middlewares ...fiber.Handler) {
+	for _, m := range middlewares {
+		router.Use(m)
+	}
 	router.Get("/", h.list)
 	router.Post("/", h.create)
 	router.Get("/:id", h.get)
@@ -763,8 +767,10 @@ func kitGinRouter(domain string) string {
 
 import "github.com/gin-gonic/gin"
 
-// RegisterRoutes attaches the resource endpoints to the router group.
-func RegisterRoutes(group *gin.RouterGroup, h *Handler) {
+// SetRoutes attaches the resource endpoints to the router group, applying any
+// group-scoped middleware passed by the caller.
+func SetRoutes(group *gin.RouterGroup, h *Handler, middlewares ...gin.HandlerFunc) {
+	group.Use(middlewares...)
 	group.GET("", h.list)
 	group.POST("", h.create)
 	group.GET("/:id", h.get)
@@ -887,8 +893,10 @@ func kitEchoRouter(domain string) string {
 
 import "github.com/labstack/echo/v4"
 
-// RegisterRoutes attaches the resource endpoints to the router group.
-func RegisterRoutes(group *echo.Group, h *Handler) {
+// SetRoutes attaches the resource endpoints to the router group, applying any
+// group-scoped middleware passed by the caller.
+func SetRoutes(group *echo.Group, h *Handler, middlewares ...echo.MiddlewareFunc) {
+	group.Use(middlewares...)
 	group.GET("", h.list)
 	group.POST("", h.create)
 	group.GET("/:id", h.get)
