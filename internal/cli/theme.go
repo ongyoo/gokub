@@ -63,7 +63,6 @@ func logo(out io.Writer, version, detail string) {
 		}
 		fmt.Fprintln(out, line)
 		fmt.Fprintln(out, "      "+p.dim("Powered by ")+p.silver("Roomkub  ")+p.cyan("https://www.roomkub.com"))
-		fmt.Fprintln(out, "      "+p.dim("Contact            ")+p.silver("roomkub.thailand@gmail.com"))
 	}
 }
 

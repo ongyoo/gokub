@@ -23,9 +23,14 @@ trap 'rm -rf "$TEMP"' EXIT
 cd "$ROOT"
 go build -o "$TEMP/gokub" ./cmd/gokub
 
-# Outside a project, Help is the sixth Command Center item.
-printf '\033[B\033[B\033[B\033[B\033[B\r' |
-  timeout 10s script -qec "cd '$TEMP' && '$TEMP/gokub'" /dev/null > "$TEMP/output.txt"
+# The Command Center loops until the user leaves. Outside a project the items are:
+# New project, Community templates, Plugins, Install shell completion, Update CLI,
+# Help (6th), Exit (7th). Select Help (5 downs), then from the redrawn menu select
+# Exit (6 downs) so the program terminates on its own.
+select_help=$'\033[B\033[B\033[B\033[B\033[B\r'
+select_exit=$'\033[B\033[B\033[B\033[B\033[B\033[B\r'
+printf '%s%s' "$select_help" "$select_exit" |
+  timeout 15s script -qec "cd '$TEMP' && '$TEMP/gokub'" /dev/null > "$TEMP/output.txt"
 
 grep -Fq 'Choose workflow' "$TEMP/output.txt"
 grep -Fq 'Commands' "$TEMP/output.txt"

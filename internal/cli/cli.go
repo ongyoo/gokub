@@ -103,7 +103,11 @@ func runCommandCenter(in io.Reader, out, errOut io.Writer) error {
 		_, projectErr := os.Stat(manifest.FileName)
 		inProject := projectErr == nil
 		actions := commandCenterActions(inProject)
-		selected := newPrompter(in, out, 1).choice("Choose workflow", actions, actions[0])
+		selected, ok := newPrompter(in, out, 1).menuChoice("Choose workflow", actions, actions[0])
+		if !ok {
+			// Input ended (EOF or closed terminal): leave the command center.
+			return nil
+		}
 		exit, err := runCommandCenterAction(selected, in, out, errOut)
 		if err != nil {
 			fmt.Fprintf(out, "  %s %v\n", palette.fail("error:"), err)
@@ -1584,6 +1588,17 @@ func newPrompter(in io.Reader, out io.Writer, total int) *prompter {
 func (p *prompter) ask(label, fallback string) string {
 	step := p.nextStep()
 	return promptStepReader(p.reader, p.out, step, p.total, label, fallback)
+}
+
+// menuChoice renders an interactive choice for the looping command center. It
+// returns ok=false when the input ends (EOF or a closed terminal) so the caller
+// can leave the loop instead of blocking on the next keypress.
+func (p *prompter) menuChoice(label string, options []string, fallback string) (string, bool) {
+	step := p.nextStep()
+	if p.input != nil && terminalAvailable(p.input) {
+		return p.choiceInteractive(step, label, options, fallback)
+	}
+	return fallback, false
 }
 
 func (p *prompter) choice(label string, options []string, fallback string) string {
