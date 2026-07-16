@@ -22,9 +22,10 @@ ordinary Go code that your team fully owns.
 ```text
 You choose                         GOKUB prepares
 --------------------------------  -------------------------------------
-Monolith or microservices         Clean, domain-focused project layout
-Gin, Fiber, gRPC, or net/http     Secure HTTP lifecycle and health checks
-PostgreSQL, MongoDB, messaging    Ready-to-wire platform adapters
+Domain-focused service layout      cmd/<name>-service, internal/<domain>, pkg/*
+Gin, Fiber, or Echo                Secure HTTP lifecycle and health checks
+gorm + PostgreSQL                  Repository, service, handler, and router
+RabbitMQ, Kafka, or NATS           Real, swappable event publisher
 Go 1.26, 1.25, or custom          Matching go.mod, Docker, and CI versions
 Developer and AI workflows        IDE debug, agent skills, and MCP config
 ```
@@ -73,10 +74,8 @@ Project name      example-api
 Go module         github.com/example/example-api
 Go version        1.26 (recommended)
 Project style     monolith
-Template          monolith
-Framework         gin
+Framework         gin | fiber | echo
 Database          postgres
-Architecture      clean
 Messaging         none
 Recipe            none
 ```
@@ -86,7 +85,7 @@ Run the generated service:
 ```bash
 cd example-api
 go test ./...
-go run ./cmd/example-api
+go run ./cmd/example-api-service
 ```
 
 The project already includes Docker, GitHub Actions, VS Code and JetBrains debug
