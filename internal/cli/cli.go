@@ -1150,32 +1150,6 @@ func applyCapabilityProvider(root, capabilityName, provider string, replace bool
 	return nil
 }
 
-func enabledProviders(m manifest.Manifest, providers []string) []string {
-	enabled := []string{}
-	for _, provider := range providers {
-		if contains(m.Features, provider) {
-			enabled = append(enabled, provider)
-		}
-	}
-	return enabled
-}
-
-func enabledProvidersForCapability(m manifest.Manifest, capabilityName string) []string {
-	capability := catalog.Capabilities[capabilityName]
-	enabled := enabledProviders(m, capability.Providers)
-	switch capabilityName {
-	case "database":
-		if m.Database != "" && m.Database != "none" && catalog.ProviderForCapability(capabilityName, m.Database) && !contains(enabled, m.Database) {
-			enabled = append(enabled, m.Database)
-		}
-	case "messaging":
-		if m.Messaging != "" && m.Messaging != "none" && catalog.ProviderForCapability(capabilityName, m.Messaging) && !contains(enabled, m.Messaging) {
-			enabled = append(enabled, m.Messaging)
-		}
-	}
-	return enabled
-}
-
 func contains(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
@@ -1776,10 +1750,6 @@ func wizardHeader(out io.Writer) {
 	fmt.Fprintln(out, p.cyan("GOKUB Project Wizard"))
 	fmt.Fprintln(out, p.dim("Use Enter for recommended values. Use Up/Down in menus."))
 	fmt.Fprintln(out)
-}
-
-func prompt(in io.Reader, out io.Writer, label, fallback string) string {
-	return promptReader(bufio.NewReader(in), out, label, fallback)
 }
 
 func promptReader(reader *bufio.Reader, out io.Writer, label, fallback string) string {

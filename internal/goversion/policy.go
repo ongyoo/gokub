@@ -26,7 +26,7 @@ const (
 
 func Validate(version string) error {
 	if !versionPattern.MatchString(version) {
-		return fmt.Errorf("Go version %q must use major.minor format, for example %s", version, Recommended)
+		return fmt.Errorf("version %q must use major.minor format, for example %s", version, Recommended)
 	}
 	return nil
 }

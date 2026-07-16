@@ -130,7 +130,7 @@ func Apply(plan Plan, client *http.Client) (Result, error) {
 		return Result{}, fmt.Errorf("self-update is not supported on Windows; install the new release manually")
 	}
 	if strings.Contains(filepath.ToSlash(plan.Executable), "/Cellar/") {
-		return Result{}, fmt.Errorf("Homebrew installation detected; use brew upgrade gokub")
+		return Result{}, fmt.Errorf("detected a Homebrew installation; use brew upgrade gokub")
 	}
 	if err := validateDownloadURL(plan.ArchiveURL, plan.allowHTTP); err != nil {
 		return Result{}, err

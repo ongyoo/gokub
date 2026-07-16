@@ -231,7 +231,12 @@ type Server struct {
 
 // NewServer creates a Fiber server bound to the given port.
 func NewServer(port string) *Server {
-	return &Server{App: fiber.New(), Addr: ":" + port}
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	})
+	return &Server{App: app, Addr: ":" + port}
 }
 
 // Run starts the server and blocks until SIGINT or SIGTERM, then shuts down.
@@ -278,7 +283,14 @@ type Server struct {
 // NewServer creates a Gin server bound to the given port.
 func NewServer(port string) *Server {
 	router := gin.New()
-	return &Server{Router: router, server: &http.Server{Addr: ":" + port, Handler: router}}
+	return &Server{Router: router, server: &http.Server{
+		Addr:              ":" + port,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}}
 }
 
 // Run starts the server and blocks until SIGINT or SIGTERM, then shuts down.
@@ -326,6 +338,10 @@ type Server struct {
 func NewServer(port string) *Server {
 	e := echo.New()
 	e.HideBanner = true
+	e.Server.ReadHeaderTimeout = 5 * time.Second
+	e.Server.ReadTimeout = 15 * time.Second
+	e.Server.WriteTimeout = 30 * time.Second
+	e.Server.IdleTimeout = 60 * time.Second
 	return &Server{Echo: e, Addr: ":" + port}
 }
 
