@@ -1,191 +1,169 @@
 <p align="center">
-  <img src="gokub_logo.png" alt="GOKUB - Go Project Kit" width="440">
+  <img src="gokub_logo.png" alt="GOKUB — Go Project Kit" width="440">
 </p>
 
 <h1 align="center">GOKUB</h1>
 
 <p align="center">
-  <strong>Build a solid Go service without rebuilding the foundation.</strong><br>
-  Guided setup, domain-focused architecture, production defaults, and AI-ready workflows.
+  <strong>Ship a production-ready Go service in one command.</strong><br>
+  A guided generator that scaffolds clean, domain-focused services you fully own —
+  no framework lock-in, no boilerplate, batteries included.
 </p>
 
 <p align="center">
   <a href="https://github.com/ongyoo/gokub/actions/workflows/ci.yml"><img src="https://github.com/ongyoo/gokub/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/ongyoo/gokub/releases/latest"><img src="https://img.shields.io/github/v/release/ongyoo/gokub?display_name=tag" alt="Latest release"></a>
+  <a href="https://github.com/ongyoo/gokub/releases/latest"><img src="https://img.shields.io/github/v/release/ongyoo/gokub?display_name=tag&color=00bfe8" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-00bfe8.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/Go-1.25%20%7C%201.26-00ADD8?logo=go&logoColor=white" alt="Go">
+  <img src="https://img.shields.io/badge/frameworks-gin%20%7C%20fiber%20%7C%20echo-3178c6" alt="Frameworks">
 </p>
 
-GOKUB creates Go applications through a friendly terminal wizard. Pick an HTTP
-framework (Gin, Fiber, or Echo), database, messaging provider, and Go version;
-GOKUB generates ordinary Go code that your team fully owns.
+---
 
-Every service follows the same production layout:
-
-```text
-cmd/<name>-service/   entrypoint and wiring
-config/               environment configuration (envconfig)
-internal/<domain>/    model, repository, service, handler, router
-internal/app/         composition and event contracts
-pkg/                  api, database (gorm), error, httpserver, middleware, utils
-```
+Pick an HTTP framework, database, and messaging provider; GOKUB generates ordinary
+Go code in a consistent, production layout:
 
 ```text
-You choose                         GOKUB prepares
---------------------------------  -------------------------------------
-Domain-focused service layout      cmd/<name>-service, internal/<domain>, pkg/*
-Gin, Fiber, or Echo                Secure HTTP lifecycle and health checks
-gorm + PostgreSQL                  Repository, service, handler, and router
-RabbitMQ, Kafka, or NATS           Real, swappable event publisher
-Go 1.26, 1.25, or custom          Matching go.mod, Docker, and CI versions
-Developer and AI workflows        IDE debug, agent skills, and MCP config
+cmd/<name>-service/   entrypoint · graceful shutdown
+config/               environment configuration (envconfig · .env)
+internal/<domain>/    model · repository · service · handler · router
+internal/app/         composition · event bus (rabbitmq | kafka | nats)
+pkg/                  api · crypto · database (gorm) · error · httpserver
+                      middleware · utils · validator
 ```
 
-## Install
+## ✨ Features
 
-The installer supports macOS and Linux on Intel and ARM:
+| | |
+|---|---|
+| 🧩 **Framework choice** | Generate for **Gin**, **Fiber**, or **Echo** — only the chosen one, no dead code |
+| 🗄️ **gorm + PostgreSQL** | Repository/service/handler/router per domain, ready to extend |
+| ✅ **Validated requests** | `go-playground/validator` tags, rejected with 400 before your service runs |
+| 🔐 **Encryption built in** | AES-256-GCM helpers + a `Secret` column type that encrypts values at rest |
+| 📨 **Real messaging** | RabbitMQ / Kafka / NATS publishers, swappable with `enable` · `switch` · `disable` |
+| 🛡️ **Hardened HTTP** | Timeouts, graceful shutdown, request-id, CORS, secure headers, panic recovery |
+| ❤️ **Health probes** | `/health/live` and a `/health/ready` that pings the database |
+| 🤖 **AI-native** | Choose Codex / Claude / Copilot / Gemini guidance at create time; MCP server included |
+| 🧪 **Quality gates** | `gofmt`, `go vet`, `staticcheck`, `golangci-lint`, race tests — all green out of the box |
+
+## 📦 Install
+
+macOS and Linux, Intel and ARM:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ongyoo/gokub/main/install.sh)"
 ```
 
-Or use your preferred package manager:
+Or your package manager of choice:
 
 ```bash
-# Homebrew
-brew install ongyoo/tap/gokub
-
-# Go
-go install github.com/ongyoo/gokub/cmd/gokub@latest
+brew install ongyoo/tap/gokub                      # Homebrew
+go install github.com/ongyoo/gokub/cmd/gokub@latest # Go
 ```
-
-Verify the installation:
 
 ```bash
-gokub version
+gokub version   # verify
 ```
 
-Generated projects require a Go toolchain matching the version selected in the
-wizard. New projects default to Go 1.26, with Go 1.25 available as the conservative
-baseline.
-
-## Create Your First Project
-
-Start the wizard:
+## 🚀 Quick start
 
 ```bash
 gokub new
 ```
 
-Use **Up/Down** to move, **Enter** to select, and press **Enter** on a text field
-to accept the recommended value. No long command is required.
+Arrow keys to move, **Enter** to accept the recommended value. Eight focused
+questions — nothing that doesn't change the output:
 
 ```text
 Project name      example-api
 Go module         github.com/example/example-api
 Go version        1.26 (recommended)
-Project style     monolith
 Framework         gin | fiber | echo
 Database          postgres
 Messaging         none
+Vibe coding       all        ← AI assistants: all | codex | claude | copilot | gemini | none
 Recipe            none
 ```
 
-Run the generated service:
+When it finishes, GOKUB steps into the project and opens an in-project command
+center. Run it:
 
 ```bash
 cd example-api
-go test ./...
-go run ./cmd/example-api-service
+docker compose up -d postgres
+make run        # or: go run ./cmd/example-api-service
 ```
 
-The project already includes Docker, GitHub Actions, VS Code and JetBrains debug
-configuration, health checks, tests, agent guidance, and local environment examples.
+A ready-to-run, git-ignored `.env` (with a unique encryption key) is already there.
 
-## Everyday Workflows
+## 🧱 What every project ships
 
-Run `gokub` inside a generated project for a context-aware command menu, or use
-commands directly:
+- **Domain module** — `model`, `repository`, `service` (interface + mockgen), `handler`
+  (exported methods + swagger godoc), `router` (`SetRoutes` with group middleware)
+- **Server** — read/write/idle timeouts and signal-based graceful shutdown
+- **Middleware** — request-id, CORS, secure headers, panic recovery, structured logging (logrus)
+- **Config** — `envconfig` + `godotenv`, so `.env` just works locally
+- **Security** — `pkg/crypto` (AES-256-GCM) and an encrypted `Secret` gorm column
+- **Ops** — Dockerfile, docker-compose, GitHub Actions CI, `.golangci.yml` + `make lint`
+- **DX** — VS Code & JetBrains run/debug configs, agent guidance, `.mcp.json`
+
+## ⚡ Everyday workflows
+
+Run `gokub` inside a project for the command center, or use commands directly:
 
 | Goal | Command |
 |---|---|
 | Add a CRUD domain | `gokub add crud product` |
-| Generate models from JSON | `gokub add model user --from user.json` |
+| Add a custom named module | `gokub add custom orders` |
+| Generate a model from a file | `gokub add model user --from user.json` |
+| Generate a model from inline JSON | `gokub add model user --json '{"id":1,"name":"Ada"}'` |
 | Add authentication | `gokub add auth` |
-| Enable Kafka | `gokub enable messaging kafka` |
-| Switch to RabbitMQ | `gokub switch messaging rabbitmq` |
-| Apply an event-driven stack | `gokub recipe add event-driven` |
-| Inspect project capabilities | `gokub status` |
-| Check project health | `gokub doctor` |
-| Run the quality gate | `gokub score --fail-under 80` |
-| Check architecture boundaries | `gokub graph --check` |
-
-Discover every command without leaving the terminal:
+| Enable / switch messaging | `gokub enable messaging kafka` · `gokub switch messaging rabbitmq` |
+| Add AI assistant guidance later | `gokub agent init --provider claude` |
+| Project state & health | `gokub status` · `gokub doctor` |
+| Quality gate & architecture | `gokub score --fail-under 80` · `gokub graph --check` |
 
 ```bash
-gokub help
+gokub help          # discover everything
 gokub help new
-gokub help add
 ```
 
-## Templates That Fit Your Team
+## 🤖 Built for developers and AI
 
-Choose the HTTP framework with `--framework gin|fiber|echo`, or import any local
-project folder as a reusable team template:
+Every project can carry shared context for humans and coding agents:
 
-```bash
-gokub template add team-api ./path/to/example-project
-gokub template list
-gokub new
-```
-
-Custom templates support placeholders such as `{{project_name}}`, `{{module}}`,
-and `{{go_version}}`. GOKUB excludes Git metadata, secrets, caches, dependencies,
-and build output when importing a folder.
-
-## Built For Developers And AI
-
-Every generated project includes shared context for humans and coding agents:
-
-- VS Code and GoLand/IntelliJ run and debug configurations
-- `AGENTS.md`, `CLAUDE.md`, Gemini, and GitHub Copilot instructions
-- Portable skills for Codex, Claude, Copilot, Gemini, and compatible agents
-- `.codex/config.toml` and `.mcp.json` for MCP clients
-- Machine-readable `status`, `doctor`, `score`, and graph output
-
-Install or refresh agent skills in any GOKUB project:
+- `AGENTS.md`, `CLAUDE.md`, Gemini and GitHub Copilot instructions
+- Portable skills for Codex, Claude, Copilot, Gemini
+- `.codex/config.toml` and `.mcp.json`; `gokub mcp serve` exposes typed tools
+- Machine-readable `status`, `doctor`, `score`, and `graph --format json`
 
 ```bash
-gokub skill install
-gokub agent init
+gokub agent init --provider all
 gokub mcp serve
 ```
 
-MCP mode uses clean JSON-RPC output, so the terminal logo never pollutes the
-protocol stream.
-
-Install the VS Code extension from the latest release:
+VS Code extension (from the latest release):
 
 ```bash
-curl -fL https://github.com/ongyoo/gokub/releases/latest/download/gokub-vscode.vsix \
-  -o gokub-vscode.vsix
+curl -fL https://github.com/ongyoo/gokub/releases/latest/download/gokub-vscode.vsix -o gokub-vscode.vsix
 code --install-extension gokub-vscode.vsix
 ```
 
-## Automation
+## 🛠️ Automation
 
-Interactive use is the default, but every project choice is also scriptable:
+Every choice is scriptable for CI and repeatable setups:
 
 ```bash
 gokub new payments \
   --module github.com/example/payments \
-  --go-version 1.26 \
-  --style monolith \
-  --framework gin \
+  --framework fiber \
   --database postgres \
-  --recipe api
+  --messaging rabbitmq \
+  --agents claude \
+  --go-version 1.26
 ```
 
-JSON output is available for CI and agents:
+JSON output for pipelines and agents:
 
 ```bash
 gokub status --json
@@ -194,7 +172,7 @@ gokub score --json
 gokub graph --format json
 ```
 
-## Update And Uninstall
+## 🔄 Update & uninstall
 
 ```bash
 gokub update --check
@@ -202,35 +180,31 @@ gokub update
 gokub uninstall
 ```
 
-For Homebrew installations, use `brew upgrade gokub` and `brew uninstall gokub`
-so Homebrew keeps its package state consistent.
+Homebrew installs use `brew upgrade gokub` / `brew uninstall gokub`.
 
-## Documentation
+## 📚 Documentation
 
 | Guide | What you will find |
 |---|---|
-| [Getting started](docs/getting-started.md) | Installation, project creation, and first run |
-| [CLI reference](docs/cli-reference.md) | Commands, features, capabilities, and recipes |
-| [Project templates](docs/project-templates.md) | Monolith, microservices, stack, and defaults |
-| [Go version policy](docs/go-versions.md) | Recommended, conservative, and custom versions |
-| [Custom templates](docs/custom-templates.md) | Turn a local folder into a reusable template |
-| [JSON model generator](docs/json-model-generator.md) | Generate typed Go models from JSON or JSON Schema |
-| [AI and IDE integrations](docs/integrations.md) | Codex, Claude, Copilot, MCP, VS Code, and JetBrains |
-| [Full documentation](docs/README.md) | Upgrades, plugins, skills, development, and releases |
+| [Getting started](docs/getting-started.md) | Installation, project creation, first run |
+| [CLI reference](docs/cli-reference.md) | Commands, features, capabilities, recipes |
+| [Project templates](docs/project-templates.md) | Layout and defaults |
+| [Go version policy](docs/go-versions.md) | Recommended, conservative, custom |
+| [Custom templates](docs/custom-templates.md) | Turn a folder into a reusable template |
+| [JSON model generator](docs/json-model-generator.md) | Typed Go models from JSON or JSON Schema |
+| [AI and IDE integrations](docs/integrations.md) | Codex, Claude, Copilot, MCP, VS Code, JetBrains |
+| [Full documentation](docs/README.md) | Upgrades, plugins, skills, development, releases |
 
-## Platform Support
+## 💻 Platform support
 
 | Platform | Intel | ARM |
 |---|:---:|:---:|
-| macOS | Yes | Yes |
-| Linux | Yes | Yes |
-
-GOKUB is available under the [MIT License](LICENSE). Contributions, templates,
-recipes, providers, plugins, and skill packs are welcome.
+| macOS | ✅ | ✅ |
+| Linux | ✅ | ✅ |
 
 ---
 
 <p align="center">
-  Powered by <a href="https://www.roomkub.com"><strong>Roomkub</strong></a><br>
-  <a href="mailto:roomkub.thailand@gmail.com">roomkub.thailand@gmail.com</a>
+  GOKUB is <a href="LICENSE">MIT licensed</a>. Templates, plugins, recipes, and skill packs welcome.<br>
+  Powered by <a href="https://www.roomkub.com"><strong>Roomkub</strong></a>
 </p>
