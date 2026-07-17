@@ -71,6 +71,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
@@ -96,9 +97,15 @@ func main() {
 	handler := %[2]s.NewHandler(service)
 
 	server := httpserver.NewServer(cfg.Port)
-	server.App.Use(middleware.Recover(), middleware.SecureHeaders(), middleware.RequestLogger())
+	server.App.Use(middleware.Recover(), middleware.RequestID(), middleware.SecureHeaders(), middleware.CORS(), middleware.RequestLogger())
 	server.App.Get("/health/live", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"status": "ok"}) })
-	server.App.Get("/health/ready", func(c fiber.Ctx) error { return c.JSON(fiber.Map{"status": "ok"}) })
+	server.App.Get("/health/ready", func(c fiber.Ctx) error {
+		if err := pingDatabase(database); err != nil {
+			logrus.Warnf("readiness check failed: %%v", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "unavailable"})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
 
 	api := server.App.Group("/api")
 	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
@@ -106,6 +113,14 @@ func main() {
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
 	}
+}
+
+func pingDatabase(database *gorm.DB) error {
+	sqlDB, err := database.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
 }
 `, module, domain)
 }
@@ -119,6 +134,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
@@ -144,9 +160,16 @@ func main() {
 	handler := %[2]s.NewHandler(service)
 
 	server := httpserver.NewServer(cfg.Port)
-	server.Router.Use(middleware.Recover(), middleware.SecureHeaders(), middleware.RequestLogger())
+	server.Router.Use(middleware.Recover(), middleware.RequestID(), middleware.SecureHeaders(), middleware.CORS(), middleware.RequestLogger())
 	server.Router.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
-	server.Router.GET("/health/ready", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
+	server.Router.GET("/health/ready", func(c *gin.Context) {
+		if err := pingDatabase(database); err != nil {
+			logrus.Warnf("readiness check failed: %%v", err)
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	api := server.Router.Group("/api")
 	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
@@ -154,6 +177,14 @@ func main() {
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
 	}
+}
+
+func pingDatabase(database *gorm.DB) error {
+	sqlDB, err := database.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
 }
 `, module, domain)
 }
@@ -167,6 +198,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
@@ -192,9 +224,15 @@ func main() {
 	handler := %[2]s.NewHandler(service)
 
 	server := httpserver.NewServer(cfg.Port)
-	server.Echo.Use(middleware.Recover(), middleware.SecureHeaders(), middleware.RequestLogger())
+	server.Echo.Use(middleware.Recover(), middleware.RequestID(), middleware.SecureHeaders(), middleware.CORS(), middleware.RequestLogger())
 	server.Echo.GET("/health/live", func(c echo.Context) error { return c.JSON(http.StatusOK, map[string]string{"status": "ok"}) })
-	server.Echo.GET("/health/ready", func(c echo.Context) error { return c.JSON(http.StatusOK, map[string]string{"status": "ok"}) })
+	server.Echo.GET("/health/ready", func(c echo.Context) error {
+		if err := pingDatabase(database); err != nil {
+			logrus.Warnf("readiness check failed: %%v", err)
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+		}
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
 
 	api := server.Echo.Group("/api")
 	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
@@ -202,6 +240,14 @@ func main() {
 	if err := server.Run(); err != nil {
 		logrus.Fatalf("server: %%v", err)
 	}
+}
+
+func pingDatabase(database *gorm.DB) error {
+	sqlDB, err := database.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Ping()
 }
 `, module, domain)
 }
@@ -374,9 +420,11 @@ func kitFiberMiddleware() string {
 	return `package middleware
 
 import (
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -417,6 +465,40 @@ func SecureHeaders() fiber.Handler {
 		return c.Next()
 	}
 }
+
+// RequestID ensures every request carries an X-Request-ID for tracing.
+func RequestID() fiber.Handler {
+	return func(c fiber.Ctx) error {
+		id := c.Get("X-Request-ID")
+		if id == "" {
+			id = uuid.NewString()
+		}
+		c.Set("X-Request-ID", id)
+		c.Locals("request_id", id)
+		return c.Next()
+	}
+}
+
+// CORS applies cross-origin headers and answers preflight requests. Set
+// CORS_ALLOW_ORIGIN to restrict the allowed origin (defaults to *).
+func CORS() fiber.Handler {
+	return func(c fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Origin", corsOrigin())
+		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Request-ID")
+		if c.Method() == fiber.MethodOptions {
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+		return c.Next()
+	}
+}
+
+func corsOrigin() string {
+	if origin := os.Getenv("CORS_ALLOW_ORIGIN"); origin != "" {
+		return origin
+	}
+	return "*"
+}
 `
 }
 
@@ -425,9 +507,11 @@ func kitGinMiddleware() string {
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -467,6 +551,41 @@ func SecureHeaders() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequestID ensures every request carries an X-Request-ID for tracing.
+func RequestID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.GetHeader("X-Request-ID")
+		if id == "" {
+			id = uuid.NewString()
+		}
+		c.Writer.Header().Set("X-Request-ID", id)
+		c.Set("request_id", id)
+		c.Next()
+	}
+}
+
+// CORS applies cross-origin headers and answers preflight requests. Set
+// CORS_ALLOW_ORIGIN to restrict the allowed origin (defaults to *).
+func CORS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", corsOrigin())
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Request-ID")
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
+}
+
+func corsOrigin() string {
+	if origin := os.Getenv("CORS_ALLOW_ORIGIN"); origin != "" {
+		return origin
+	}
+	return "*"
+}
 `
 }
 
@@ -475,8 +594,10 @@ func kitEchoMiddleware() string {
 
 import (
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
@@ -524,6 +645,45 @@ func SecureHeaders() echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+// RequestID ensures every request carries an X-Request-ID for tracing.
+func RequestID() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			id := c.Request().Header.Get("X-Request-ID")
+			if id == "" {
+				id = uuid.NewString()
+			}
+			c.Response().Header().Set("X-Request-ID", id)
+			c.Set("request_id", id)
+			return next(c)
+		}
+	}
+}
+
+// CORS applies cross-origin headers and answers preflight requests. Set
+// CORS_ALLOW_ORIGIN to restrict the allowed origin (defaults to *).
+func CORS() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			h := c.Response().Header()
+			h.Set("Access-Control-Allow-Origin", corsOrigin())
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			h.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Request-ID")
+			if c.Request().Method == http.MethodOptions {
+				return c.NoContent(http.StatusNoContent)
+			}
+			return next(c)
+		}
+	}
+}
+
+func corsOrigin() string {
+	if origin := os.Getenv("CORS_ALLOW_ORIGIN"); origin != "" {
+		return origin
+	}
+	return "*"
 }
 `
 }

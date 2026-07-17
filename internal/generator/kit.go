@@ -126,6 +126,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		".env":                                             kitEnvFile(m.Name, m.Messaging, encryptionKey),
 		".gitignore":                                       gitignore(),
 		".dockerignore":                                    dockerignore(),
+		".golangci.yml":                                    kitGolangciFile(),
 		".github/workflows/ci.yml":                         ciFile(ciGoVersion(m)),
 		".vscode/launch.json":                              kitVSCodeFile(service),
 		".vscode/tasks.json":                               vscodeTasksFile(),
@@ -1053,6 +1054,28 @@ func Struct(s any) error {
 `
 }
 
+func kitGolangciFile() string {
+	return `run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+`
+}
+
 func kitUtilsFile() string {
 	return `package utils
 
@@ -1074,7 +1097,7 @@ func Atoi(s string, fallback int) int {
 func kitMakefile(service string) string {
 	return fmt.Sprintf(`SCORE_MIN ?= 80
 
-.PHONY: run test build fmt vet tidy doctor score graph graph-check
+.PHONY: run test build fmt vet lint tidy doctor score graph graph-check
 
 run:
 	go run ./cmd/%s
@@ -1090,6 +1113,9 @@ fmt:
 
 vet:
 	go vet ./...
+
+lint:
+	golangci-lint run ./...
 
 tidy:
 	go mod tidy
@@ -1160,6 +1186,7 @@ PORT=8080
 LOG_LEVEL=debug
 DATABASE_URL=postgres://app:app@localhost:5432/app?sslmode=disable
 APP_ENCRYPTION_KEY=%s
+CORS_ALLOW_ORIGIN=*
 `, name, encryptionKey)
 	switch messaging {
 	case "rabbitmq":
