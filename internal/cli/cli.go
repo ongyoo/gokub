@@ -169,6 +169,9 @@ func runCommandCenterAction(selected string, in io.Reader, out, errOut io.Writer
 		}
 	case "Plugins":
 		return false, runPlugin([]string{"list"}, in, out, errOut)
+	case "AI assistants":
+		provider := newPrompter(in, out, 1).choice("Add assistant guidance", []string{"all", "codex", "claude", "copilot", "gemini", "portable"}, "all")
+		return false, runAgent([]string{"init", "--provider", provider}, out)
 	case "Agent skills":
 		return false, runSkill([]string{"list"}, out)
 	case "Update CLI":
@@ -193,7 +196,7 @@ func commandCenterActions(inProject bool) []string {
 	return []string{
 		"Add feature", "Generate model from JSON", "Project status", "Doctor",
 		"Project score", "Dependency graph", "Upgrade project", "Community templates",
-		"Plugins", "Agent skills", "Install shell completion", "Update CLI", "New project", "Help", "Exit",
+		"Plugins", "AI assistants", "Agent skills", "Install shell completion", "Update CLI", "New project", "Help", "Exit",
 	}
 }
 
@@ -904,7 +907,8 @@ func runAddModel(args []string, in io.Reader, out io.Writer) error {
 	}
 	fs := flag.NewFlagSet("add model", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	input := fs.String("from", "", "JSON sample or JSON Schema path")
+	input := fs.String("from", "", "JSON sample/JSON Schema path, or inline JSON")
+	jsonText := fs.String("json", "", "inline JSON sample instead of a file")
 	packageName := fs.String("package", "", "generated Go package name")
 	output := fs.String("output", "", "generated Go file path")
 	force := fs.Bool("force", false, "replace an existing generated model")
@@ -912,41 +916,59 @@ func runAddModel(args []string, in io.Reader, out io.Writer) error {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return fmt.Errorf("usage: gokub add model [name] [--from file.json] [--package name] [--output path] [--force]")
+		return fmt.Errorf("usage: gokub add model [name] [--from file.json|json] [--json '<text>'] [--package name] [--output path] [--force]")
 	}
 	if _, err := manifest.Read(manifest.FileName); err != nil {
 		return fmt.Errorf("run inside a GOKUB project: %w", err)
 	}
-	promptTotal := 0
-	if *input == "" {
-		promptTotal++
-	}
-	if name == "" {
-		promptTotal++
-	}
-	prompts := newPrompter(in, out, promptTotal)
-	if *input == "" {
+	prompts := newPrompter(in, out, 0)
+	if *jsonText == "" && *input == "" {
 		files, err := discoverJSONFiles(".")
 		if err != nil {
 			return err
 		}
-		if len(files) == 0 {
-			*input = prompts.ask("JSON file", "model.json")
+		options := append([]string{"paste JSON text"}, files...)
+		selection := prompts.choice("JSON source", options, options[0])
+		if selection == "paste JSON text" {
+			*jsonText = prompts.ask("JSON", `{"id":1,"name":"Ada"}`)
 		} else {
-			*input = prompts.choice("JSON source", files, files[0])
+			*input = selection
 		}
 	}
+
+	// Accept inline JSON from --json, from --from, or from an interactive paste.
+	var content []byte
+	source := *input
+	switch {
+	case *jsonText != "":
+		content = []byte(*jsonText)
+		source = "inline JSON"
+	case looksLikeJSON(*input):
+		content = []byte(*input)
+		source = "inline JSON"
+	}
+
 	if name == "" {
-		name = prompts.ask("Model name", modelNameFromPath(*input))
+		defaultName := modelNameFromPath(*input)
+		if defaultName == "" {
+			defaultName = "model"
+		}
+		name = prompts.ask("Model name", defaultName)
 	}
 	path, err := modelgen.Generate(modelgen.Options{
-		Root: ".", Name: name, Package: *packageName, Input: *input, Output: *output, Force: *force,
+		Root: ".", Name: name, Package: *packageName, Input: *input, Content: content, Output: *output, Force: *force,
 	})
 	if err != nil {
 		return err
 	}
-	success(out, "generated %s from %s", path, *input)
+	success(out, "generated %s from %s", path, source)
 	return nil
+}
+
+// looksLikeJSON reports whether s is inline JSON rather than a file path.
+func looksLikeJSON(s string) bool {
+	t := strings.TrimSpace(s)
+	return strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[")
 }
 
 func discoverJSONFiles(root string) ([]string, error) {

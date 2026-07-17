@@ -31,6 +31,22 @@ func TestGenerateFromSampleJSON(t *testing.T) {
 	}
 }
 
+func TestGenerateFromInlineContent(t *testing.T) {
+	root := t.TempDir()
+	path, err := Generate(Options{Root: root, Name: "account", Content: []byte(`{"id":1,"balance":9.9}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(generated)
+	if !strings.Contains(text, "type Account struct") || !strings.Contains(text, `json:"balance"`) {
+		t.Fatalf("inline content model missing fields:\n%s", text)
+	}
+}
+
 func TestGenerateRejectsOutputOutsideProject(t *testing.T) {
 	root := t.TempDir()
 	input := filepath.Join(root, "model.json")

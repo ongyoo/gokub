@@ -502,7 +502,7 @@ func TestAddModelDiscoversJSONAndSuggestsName(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(previous) })
 
 	var out bytes.Buffer
-	if err := Run([]string{"add", "model"}, bytes.NewBufferString("1\n\n"), &out, &out); err != nil {
+	if err := Run([]string{"add", "model"}, bytes.NewBufferString("2\n\n"), &out, &out); err != nil {
 		t.Fatal(err)
 	}
 	generated := filepath.Join(project, "internal", "domain", "profile", "model_gen.go")

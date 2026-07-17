@@ -19,6 +19,7 @@ type Options struct {
 	Name    string
 	Package string
 	Input   string
+	Content []byte
 	Output  string
 	Force   bool
 }
@@ -53,9 +54,13 @@ func Generate(options Options) (string, error) {
 	if !validPackage(options.Package) {
 		return "", fmt.Errorf("invalid package name %q", options.Package)
 	}
-	input, err := os.ReadFile(options.Input)
-	if err != nil {
-		return "", fmt.Errorf("read JSON input: %w", err)
+	input := options.Content
+	if input == nil {
+		var err error
+		input, err = os.ReadFile(options.Input)
+		if err != nil {
+			return "", fmt.Errorf("read JSON input: %w", err)
+		}
 	}
 	definitions, usesTime, err := parse(input, exported(options.Name))
 	if err != nil {
