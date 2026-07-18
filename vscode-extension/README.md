@@ -8,6 +8,7 @@ wizard in VS Code's integrated terminal.
 
 ## Commands
 
+- `GOKUB: Initialize Existing Project`
 - `GOKUB: New Project`
 - `GOKUB: Add Custom Template`
 - `GOKUB: Install Community Template`
@@ -31,5 +32,9 @@ wizard in VS Code's integrated terminal.
 
 Install the GOKUB CLI first with `make install` or configure
 `gokub.executablePath` with the path to the binary.
+
+Open an existing Go workspace and run `GOKUB: Initialize Existing Project` to
+detect its module settings, create `gokub.init`, and install agent skills and MCP
+configuration without replacing application source or existing instructions.
 
 Build the extension from this directory with `npm install && npm run package`.

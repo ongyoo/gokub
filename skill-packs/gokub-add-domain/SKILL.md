@@ -10,7 +10,7 @@ database code.
 
 ## Process
 
-1. Read `.gokub.yaml`, `AGENTS.md`, and the nearest existing domain package.
+1. Read `gokub.init`, `.gokub.yaml`, the repository instructions, and the nearest existing domain package.
 2. Use `gokub add crud <name>` when its scaffold matches the request; otherwise
    create the package within the established domain location.
 3. Define domain models and repository interfaces without HTTP, SQL, queue, or SDK
@@ -24,7 +24,9 @@ database code.
 6. Implement infrastructure adapters outside core business logic.
 7. Map requests and responses in handlers. Do not expose persistence models merely
    because their fields currently match the API.
-8. Wire constructors and routes in the relevant `cmd` composition root.
+8. Wire constructors and routes in the relevant composition root. For
+   `template: existing`, follow the repository's current package layout rather
+   than moving code into a generated layout.
 9. Add service tests using a focused repository stub and transport tests for status,
    validation, and error mapping.
 

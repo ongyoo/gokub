@@ -25,6 +25,7 @@ import (
 	"github.com/ongyoo/gokub/internal/modelgen"
 	"github.com/ongyoo/gokub/internal/plugins"
 	"github.com/ongyoo/gokub/internal/projectgraph"
+	"github.com/ongyoo/gokub/internal/projectinit"
 	"github.com/ongyoo/gokub/internal/projectstatus"
 	"github.com/ongyoo/gokub/internal/projectupgrade"
 	"github.com/ongyoo/gokub/internal/selfupdate"
@@ -42,6 +43,8 @@ func Run(args []string, in io.Reader, out, errOut io.Writer) error {
 		return runCommandCenter(in, out, errOut)
 	}
 	switch args[0] {
+	case "init":
+		return runInit(args[1:], out)
 	case "new":
 		return runNew(args[1:], in, out)
 	case "add":
@@ -125,6 +128,8 @@ func runCommandCenter(in io.Reader, out, errOut io.Writer) error {
 // keeps looping and stays ready for the next command.
 func runCommandCenterAction(selected string, in io.Reader, out, errOut io.Writer) (bool, error) {
 	switch selected {
+	case "Initialize existing project":
+		return true, runInit(nil, out)
 	case "New project":
 		return true, runNew(nil, in, out)
 	case "Add feature":
@@ -191,13 +196,54 @@ func runCommandCenterAction(selected string, in io.Reader, out, errOut io.Writer
 
 func commandCenterActions(inProject bool) []string {
 	if !inProject {
-		return []string{"New project", "Community templates", "Plugins", "Install shell completion", "Update CLI", "Help", "Exit"}
+		return []string{"Initialize existing project", "New project", "Community templates", "Plugins", "Install shell completion", "Update CLI", "Help", "Exit"}
 	}
 	return []string{
 		"Add feature", "Generate model from JSON", "Project status", "Doctor",
 		"Project score", "Dependency graph", "Upgrade project", "Community templates",
 		"Plugins", "AI assistants", "Agent skills", "Install shell completion", "Update CLI", "New project", "Help", "Exit",
 	}
+}
+
+func runInit(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	provider := fs.String("provider", "all", "agent provider")
+	name := fs.String("name", "", "project name override")
+	framework := fs.String("framework", "", "framework override")
+	database := fs.String("database", "", "database override")
+	messaging := fs.String("messaging", "", "messaging override")
+	architecture := fs.String("architecture", "", "architecture override")
+	style := fs.String("style", "", "project style override")
+	force := fs.Bool("force", false, "refresh GOKUB-managed agent files")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 1 {
+		return fmt.Errorf("usage: gokub init [path] [flags]")
+	}
+	root := "."
+	if fs.NArg() == 1 {
+		root = fs.Arg(0)
+	}
+	result, err := projectinit.Initialize(root, projectinit.Options{
+		Provider: *provider, Name: *name, Framework: *framework, Database: *database,
+		Messaging: *messaging, Architecture: *architecture, Style: *style, Force: *force,
+	})
+	if err != nil {
+		return err
+	}
+	p := newPalette()
+	if result.CreatedManifest {
+		success(out, "initialized existing Go project %s", result.Manifest.Name)
+	} else {
+		success(out, "refreshed GOKUB agent context for %s", result.Manifest.Name)
+	}
+	fmt.Fprintf(out, "  %s %s\n", p.dim("module     "), p.silver(result.Manifest.Module))
+	fmt.Fprintf(out, "  %s %s / %s / %s\n", p.dim("detected   "), p.silver(result.Manifest.Framework), p.silver(result.Manifest.Database), p.silver(result.Manifest.Messaging))
+	fmt.Fprintf(out, "  %s %s\n", p.dim("marker     "), p.amber("gokub.init"))
+	fmt.Fprintf(out, "  %s\n", p.dim("AI agents can now read the installed skills and use GOKUB MCP tools."))
+	return nil
 }
 
 func runCompletion(args []string, out io.Writer) error {
@@ -1821,6 +1867,7 @@ func usage(out io.Writer) {
 	p := newPalette()
 	banner(out)
 	section(out, "Commands")
+	commandLine(out, exe+" init [path]", "adopt an existing Go project and install agent skills")
 	commandLine(out, exe+" new", "start the step-by-step project wizard")
 	commandLine(out, exe+" new [name] [--recipe event-driven]", "create from flags for scripts")
 	commandLine(out, exe+" add <feature> [name]", "add a capability or CRUD module")
@@ -1856,6 +1903,23 @@ func help(args []string, out io.Writer) {
 	topic := args[0]
 	section(out, strings.ToUpper(topic[:1])+topic[1:])
 	switch args[0] {
+	case "init":
+		commandLine(out, "gokub init [path]", "adopt an existing Go module without changing application source")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, p.silver("Flags"))
+		commandLine(out, "--provider <agent>", "all|codex|claude|copilot|gemini|portable")
+		commandLine(out, "--name <name>", "override the project name inferred from the folder")
+		commandLine(out, "--framework <name>", "override detected framework")
+		commandLine(out, "--database <name>", "override detected database")
+		commandLine(out, "--messaging <name>", "override detected messaging provider")
+		commandLine(out, "--architecture <name>", "override detected architecture")
+		commandLine(out, "--style <name>", "override monolith or microservices detection")
+		commandLine(out, "--force", "refresh GOKUB-managed agent files; application source is never replaced")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, p.silver("Examples"))
+		commandLine(out, "gokub init", "initialize the current Go module")
+		commandLine(out, "gokub init ./my-api --provider all", "initialize another local project")
+		commandLine(out, "gokub init --framework gin --database postgres", "override auto-detection")
 	case "new":
 		commandLine(out, "gokub new", "start the step-by-step project wizard")
 		commandLine(out, "gokub new [name] [flags]", "create from flags for scripts")

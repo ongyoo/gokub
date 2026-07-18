@@ -105,7 +105,7 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
-const commands = "new add remove enable disable switch status doctor score graph upgrade update recipe agent template plugin skill mcp completion uninstall version help"
+const commands = "init new add remove enable disable switch status doctor score graph upgrade update recipe agent template plugin skill mcp completion uninstall version help"
 const features = "auth crud postgres mongodb redis kafka rabbitmq nats grpc cron email websocket otel docker github-actions outbox model"
 const capabilities = "authentication cache database messaging observability infrastructure"
 
@@ -134,7 +134,7 @@ var zshScript = `#compdef gokub
 _gokub() {
   local -a commands
   commands=(
-    'new:create a Go project' 'add:add a feature' 'remove:remove a feature'
+    'init:adopt an existing Go project' 'new:create a Go project' 'add:add a feature' 'remove:remove a feature'
     'enable:enable a capability' 'disable:disable a capability' 'switch:switch provider'
     'status:show project state' 'doctor:check project health' 'score:score project health'
     'graph:show dependencies' 'upgrade:upgrade project metadata' 'update:update GOKUB'

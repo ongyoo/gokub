@@ -10,7 +10,7 @@ verification.
 
 ## Review
 
-1. Read `.gokub.yaml`, `AGENTS.md`, and the change diff or touched files.
+1. Read `gokub.init`, `.gokub.yaml`, the repository instructions, and the change diff or touched files.
 2. Trace behavior across handler, service, repository, adapter, and process lifecycle.
 3. Check context propagation, error wrapping, cleanup, timeouts, concurrency, and
    graceful shutdown.

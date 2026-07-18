@@ -41,6 +41,8 @@ gokub completion fish
 ## Projects
 
 ```bash
+gokub init
+gokub init ./existing-api --provider all
 gokub new
 gokub new example-api --module github.com/example/example-api --go-version 1.26
 gokub status
@@ -50,6 +52,19 @@ gokub doctor --json
 gokub score
 gokub graph
 gokub upgrade --check
+```
+
+`init` adopts an existing Go module without changing application source. It reads
+`go.mod`, detects supported frameworks, databases, messaging libraries, project
+style, and architecture, then creates `.gokub.yaml`, `gokub.init`, MCP config, and
+portable skills. Existing `AGENTS.md`, `CLAUDE.md`, and agent config files are
+preserved. Re-running the command installs missing files and refreshes the marker;
+use `--force` only to refresh GOKUB-managed agent files.
+
+Detection can be corrected explicitly:
+
+```bash
+gokub init --framework gin --database postgres --style monolith
 ```
 
 `new` creates a project through the interactive wizard. Use `--go-version`

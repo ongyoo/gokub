@@ -124,6 +124,19 @@ async function installSkills() {
   runInteractive(["skill", "install", "--agent", agent], "GOKUB Agent Skills");
 }
 
+async function initProject() {
+  if (!workspacePath()) {
+    vscode.window.showWarningMessage("Open a Go project folder before initializing GOKUB.");
+    return;
+  }
+  const provider = await vscode.window.showQuickPick(
+    ["all", "codex", "claude", "copilot", "gemini", "portable"],
+    { title: "Initialize project for AI agents", placeHolder: "Select an agent target" }
+  );
+  if (!provider) return;
+  runInteractive(["init", "--provider", provider], "GOKUB Initialize Project");
+}
+
 async function createPlugin() {
   const name = await vscode.window.showInputBox({
     title: "Plugin name",
@@ -172,6 +185,7 @@ async function qualityGate() {
 function activate(context) {
   const commands = {
     "gokub.open": () => runInteractive([], "GOKUB Command Center"),
+    "gokub.initProject": initProject,
     "gokub.newProject": () => runInteractive(["new"], "GOKUB New Project"),
     "gokub.addTemplate": addTemplate,
     "gokub.installTemplate": installTemplate,

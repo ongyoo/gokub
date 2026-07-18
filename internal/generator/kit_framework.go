@@ -4,14 +4,14 @@ import "fmt"
 
 // kitMainFile returns the cmd/<service>/main.go entrypoint wired for the chosen
 // HTTP framework.
-func kitMainFile(module, framework, domain string) string {
+func kitMainFile(module, framework, domain, database string) string {
 	switch framework {
 	case "fiber":
-		return kitFiberMain(module, domain)
+		return kitFiberMain(module, domain, database)
 	case "echo":
-		return kitEchoMain(module, domain)
+		return kitEchoMain(module, domain, database)
 	default:
-		return kitGinMain(module, domain)
+		return kitGinMain(module, domain, database)
 	}
 }
 
@@ -63,7 +63,7 @@ func kitRouterFile(framework, domain string) string {
 // main.go
 // ---------------------------------------------------------------------------
 
-func kitFiberMain(module, domain string) string {
+func kitFiberMain(module, domain, database string) string {
 	return fmt.Sprintf(`package main
 
 import (
@@ -71,12 +71,12 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+	%[3]s
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
 	"%[1]s/internal/%[2]s"
-	db "%[1]s/pkg/database/postgresql"
+	db "%[1]s/pkg/database/%[4]s"
 	httpserver "%[1]s/pkg/httpserver/fiber"
 	middleware "%[1]s/pkg/middleware/fiber"
 )
@@ -115,17 +115,11 @@ func main() {
 	}
 }
 
-func pingDatabase(database *gorm.DB) error {
-	sqlDB, err := database.DB()
-	if err != nil {
-		return err
-	}
-	return sqlDB.Ping()
-}
-`, module, domain)
+%[5]s
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
 }
 
-func kitGinMain(module, domain string) string {
+func kitGinMain(module, domain, database string) string {
 	return fmt.Sprintf(`package main
 
 import (
@@ -134,12 +128,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+	%[3]s
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
 	"%[1]s/internal/%[2]s"
-	db "%[1]s/pkg/database/postgresql"
+	db "%[1]s/pkg/database/%[4]s"
 	httpserver "%[1]s/pkg/httpserver/gin"
 	middleware "%[1]s/pkg/middleware/gin"
 )
@@ -179,17 +173,11 @@ func main() {
 	}
 }
 
-func pingDatabase(database *gorm.DB) error {
-	sqlDB, err := database.DB()
-	if err != nil {
-		return err
-	}
-	return sqlDB.Ping()
-}
-`, module, domain)
+%[5]s
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
 }
 
-func kitEchoMain(module, domain string) string {
+func kitEchoMain(module, domain, database string) string {
 	return fmt.Sprintf(`package main
 
 import (
@@ -198,12 +186,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
+	%[3]s
 
 	"%[1]s/config"
 	"%[1]s/internal/app/events"
 	"%[1]s/internal/%[2]s"
-	db "%[1]s/pkg/database/postgresql"
+	db "%[1]s/pkg/database/%[4]s"
 	httpserver "%[1]s/pkg/httpserver/echo"
 	middleware "%[1]s/pkg/middleware/echo"
 )
@@ -242,14 +230,8 @@ func main() {
 	}
 }
 
-func pingDatabase(database *gorm.DB) error {
-	sqlDB, err := database.DB()
-	if err != nil {
-		return err
-	}
-	return sqlDB.Ping()
-}
-`, module, domain)
+%[5]s
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
 }
 
 // ---------------------------------------------------------------------------
@@ -699,7 +681,6 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 
 	"%[1]s/pkg/api"
 	"%[1]s/pkg/utils"
@@ -774,10 +755,7 @@ func (h Handler) Create(c fiber.Ctx) error {
 // @Failure  404  {object}  api.APIError
 // @Router   /%[2]ss/{id} [get]
 func (h Handler) Get(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Params("id")
 	item, err := h.service.Get(c.Context(), id)
 	if err != nil {
 		return fail(c, http.StatusNotFound, err.Error())
@@ -796,10 +774,7 @@ func (h Handler) Get(c fiber.Ctx) error {
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss/{id} [patch]
 func (h Handler) Update(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Params("id")
 	var updates map[string]any
 	if err := c.Bind().Body(&updates); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
@@ -819,10 +794,7 @@ func (h Handler) Update(c fiber.Ctx) error {
 // @Success  200  {object}  api.APIMessage
 // @Router   /%[2]ss/{id} [delete]
 func (h Handler) Delete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Params("id")
 	if err := h.service.Delete(c.Context(), id); err != nil {
 		return fail(c, http.StatusInternalServerError, err.Error())
 	}
@@ -869,7 +841,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"%[1]s/pkg/api"
 	"%[1]s/pkg/utils"
@@ -948,11 +919,7 @@ func (h Handler) Create(c *gin.Context) {
 // @Failure  404  {object}  api.APIError
 // @Router   /%[2]ss/{id} [get]
 func (h Handler) Get(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		fail(c, http.StatusBadRequest, "invalid id")
-		return
-	}
+	id := c.Param("id")
 	item, err := h.service.Get(c.Request.Context(), id)
 	if err != nil {
 		fail(c, http.StatusNotFound, err.Error())
@@ -972,11 +939,7 @@ func (h Handler) Get(c *gin.Context) {
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss/{id} [patch]
 func (h Handler) Update(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		fail(c, http.StatusBadRequest, "invalid id")
-		return
-	}
+	id := c.Param("id")
 	var updates map[string]any
 	if err := c.ShouldBindJSON(&updates); err != nil {
 		fail(c, http.StatusBadRequest, err.Error())
@@ -998,11 +961,7 @@ func (h Handler) Update(c *gin.Context) {
 // @Success  200  {object}  api.APIMessage
 // @Router   /%[2]ss/{id} [delete]
 func (h Handler) Delete(c *gin.Context) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		fail(c, http.StatusBadRequest, "invalid id")
-		return
-	}
+	id := c.Param("id")
 	if err := h.service.Delete(c.Request.Context(), id); err != nil {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -1047,7 +1006,6 @@ func kitEchoHandler(module, domain, typeName string) string {
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"%[1]s/pkg/api"
@@ -1123,10 +1081,7 @@ func (h Handler) Create(c echo.Context) error {
 // @Failure  404  {object}  api.APIError
 // @Router   /%[2]ss/{id} [get]
 func (h Handler) Get(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Param("id")
 	item, err := h.service.Get(c.Request().Context(), id)
 	if err != nil {
 		return fail(c, http.StatusNotFound, err.Error())
@@ -1145,10 +1100,7 @@ func (h Handler) Get(c echo.Context) error {
 // @Failure  400  {object}  api.APIError
 // @Router   /%[2]ss/{id} [patch]
 func (h Handler) Update(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Param("id")
 	var updates map[string]any
 	if err := c.Bind(&updates); err != nil {
 		return fail(c, http.StatusBadRequest, err.Error())
@@ -1168,10 +1120,7 @@ func (h Handler) Update(c echo.Context) error {
 // @Success  200  {object}  api.APIMessage
 // @Router   /%[2]ss/{id} [delete]
 func (h Handler) Delete(c echo.Context) error {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return fail(c, http.StatusBadRequest, "invalid id")
-	}
+	id := c.Param("id")
 	if err := h.service.Delete(c.Request().Context(), id); err != nil {
 		return fail(c, http.StatusInternalServerError, err.Error())
 	}

@@ -7,7 +7,16 @@ repository.
 
 ## Install
 
-New GOKUB projects receive all skills automatically. For an existing project:
+New GOKUB projects receive all skills automatically. For an existing Go project,
+initialize the complete GOKUB context in one command:
+
+```bash
+gokub init
+```
+
+This creates `gokub.init` and `.gokub.yaml`, installs skills, and configures MCP
+without replacing existing application or agent instruction files. To install
+only the skills in an already initialized project:
 
 ```bash
 gokub skill install

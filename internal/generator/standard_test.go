@@ -34,7 +34,7 @@ func TestKitProjectGeneratesLayout(t *testing.T) {
 				"pkg/api/response.go",
 				"pkg/crypto/crypto.go",
 				"pkg/error/error.go",
-				"pkg/database/postgresql/postgres.go",
+				"pkg/database/postgresql/postgresql.go",
 				"pkg/utils/utils.go",
 				"pkg/validator/validator.go",
 				".env",

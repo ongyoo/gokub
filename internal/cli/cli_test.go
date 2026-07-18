@@ -77,6 +77,9 @@ func TestNewParsesFlagsAfterProjectName(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(temp, "payment-api", ".mcp.json")); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := os.Stat(filepath.Join(temp, "payment-api", "gokub.init")); err != nil {
+		t.Fatal(err)
+	}
 	workflow, err := os.ReadFile(filepath.Join(temp, "payment-api", ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +96,29 @@ func TestNoArgsRemainsNonInteractiveForPipesAndCI(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Commands") || !strings.Contains(out.String(), "start the step-by-step project wizard") {
 		t.Fatalf("non-interactive usage missing: %s", out.String())
+	}
+}
+
+func TestInitAdoptsExistingProject(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "existing-api")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	goMod := "module example.com/existing-api\n\ngo 1.24\n\nrequire github.com/gin-gonic/gin v1.10.0\n"
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Run([]string{"init", root}, bytes.NewBuffer(nil), &out, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "initialized existing Go project") {
+		t.Fatalf("unexpected init output: %s", out.String())
+	}
+	for _, name := range []string{"gokub.init", manifest.FileName, ".mcp.json", ".agents/skills/gokub-project/SKILL.md"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("missing %s: %v", name, err)
+		}
 	}
 }
 

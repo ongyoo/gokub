@@ -113,6 +113,7 @@ Run `gokub` inside a project for the command center, or use commands directly:
 
 | Goal | Command |
 |---|---|
+| Add GOKUB + AI skills to an existing Go project | `gokub init` |
 | Add a CRUD domain | `gokub add crud product` |
 | Add a custom named module | `gokub add custom orders` |
 | Generate a model from a file | `gokub add model user --from user.json` |
@@ -132,15 +133,20 @@ gokub help new
 
 Every project can carry shared context for humans and coding agents:
 
+- `gokub.init` marks the repository as initialized; `.gokub.yaml` records detected project context
 - `AGENTS.md`, `CLAUDE.md`, Gemini and GitHub Copilot instructions
 - Portable skills for Codex, Claude, Copilot, Gemini
 - `.codex/config.toml` and `.mcp.json`; `gokub mcp serve` exposes typed tools
 - Machine-readable `status`, `doctor`, `score`, and `graph --format json`
 
 ```bash
-gokub agent init --provider all
+cd your-existing-go-project
+gokub init                 # detects go.mod and installs all agent skills safely
 gokub mcp serve
 ```
+
+`gokub init` preserves existing source and agent instruction files. Use detection
+overrides such as `--framework gin` or `--database postgres` only when needed.
 
 VS Code extension (from the latest release):
 

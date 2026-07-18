@@ -19,6 +19,7 @@
   "contributes": {
     "commands": [
       { "command": "gokub.open", "title": "GOKUB: Open Command Center" },
+      { "command": "gokub.initProject", "title": "GOKUB: Initialize Existing Project" },
       { "command": "gokub.newProject", "title": "GOKUB: New Project" },
       { "command": "gokub.addTemplate", "title": "GOKUB: Add Custom Template" },
       { "command": "gokub.installTemplate", "title": "GOKUB: Install Community Template" },

@@ -11,6 +11,7 @@ import (
 	"github.com/ongyoo/gokub/internal/agentskills"
 	"github.com/ongyoo/gokub/internal/goversion"
 	"github.com/ongyoo/gokub/internal/manifest"
+	"github.com/ongyoo/gokub/internal/projectmeta"
 	customtemplates "github.com/ongyoo/gokub/internal/templates"
 )
 
@@ -35,7 +36,14 @@ func NewProject(root string, m manifest.Manifest) error {
 		if err := customtemplates.Generate(source, root, m); err != nil {
 			return err
 		}
-		return addProjectTooling(filepath.Join(root, m.Name), m)
+		target := filepath.Join(root, m.Name)
+		if err := addProjectTooling(target, m); err != nil {
+			return err
+		}
+		if err := manifest.Write(filepath.Join(target, manifest.FileName), m); err != nil {
+			return err
+		}
+		return projectmeta.WriteMarker(target, gokub.Version, m)
 	}
 	return newKitProject(root, m)
 }
@@ -65,6 +73,16 @@ func addProjectTooling(target string, m manifest.Manifest) error {
 }
 
 func WriteAgentFiles(root, provider string) ([]string, error) {
+	return writeAgentFiles(root, provider, true, false)
+}
+
+// InitializeAgentFiles installs agent context into an existing project. By
+// default it preserves instruction/config files already owned by the project.
+func InitializeAgentFiles(root, provider string, force bool) ([]string, error) {
+	return writeAgentFiles(root, provider, force, force)
+}
+
+func writeAgentFiles(root, provider string, replaceFiles, forceSkills bool) ([]string, error) {
 	m, err := manifest.Read(filepath.Join(root, manifest.FileName))
 	if err != nil {
 		return nil, err
@@ -90,6 +108,11 @@ func WriteAgentFiles(root, provider string) ([]string, error) {
 	written := make([]string, 0, len(files))
 	for name, content := range files {
 		path := filepath.Join(root, name)
+		if !replaceFiles {
+			if _, err := os.Stat(path); err == nil {
+				continue
+			}
+		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, err
 		}
@@ -98,7 +121,7 @@ func WriteAgentFiles(root, provider string) ([]string, error) {
 		}
 		written = append(written, name)
 	}
-	installed, err := agentskills.Install(root, provider, false)
+	installed, err := agentskills.Install(root, provider, forceSkills)
 	if err != nil {
 		return nil, err
 	}
@@ -138,13 +161,17 @@ func addCRUD(root, name string) error {
 	if err != nil {
 		return fmt.Errorf("read project manifest: %w", err)
 	}
-	framework := normalizeFramework(m.Framework)
+	framework := m.Framework
+	if !containsString(supportedFrameworks, framework) {
+		return fmt.Errorf("CRUD generation requires gin, fiber, or echo; run `gokub init --framework <name>` to set the existing project's framework")
+	}
+	database := normalizeDatabase(m.Database)
 	pkg := featureName(name)
 	typeName := exported(name)
 	dir := filepath.Join(root, "internal", pkg)
 	files := map[string]string{
-		filepath.Join(dir, "model.go"):        kitModelFile(pkg, typeName),
-		filepath.Join(dir, "repository.go"):   kitRepositoryFile(pkg, typeName),
+		filepath.Join(dir, "model.go"):        kitModelFile(pkg, typeName, database),
+		filepath.Join(dir, "repository.go"):   kitRepositoryFile(pkg, typeName, database),
 		filepath.Join(dir, "service.go"):      kitServiceFile(m.Module, pkg, typeName),
 		filepath.Join(dir, "service_test.go"): kitServiceTestFile(pkg, typeName),
 		filepath.Join(dir, "handler.go"):      kitHandlerFile(m.Module, framework, pkg, typeName),
@@ -156,6 +183,15 @@ func addCRUD(root, name string) error {
 		}
 	}
 	return nil
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func writeNew(path, content string) error {
@@ -292,6 +328,30 @@ func mcpConfigFile() string {
 }
 
 func agentsFile(m manifest.Manifest) string {
+	if m.Template == "existing" {
+		return fmt.Sprintf(`# AGENTS.md
+
+This existing Go project is initialized for GOKUB-assisted development.
+
+## Project
+
+- Name: %[1]s
+- Module: %[2]s
+- HTTP framework: %[3]s
+- Database: %[4]s
+- Messaging: %[5]s
+
+## Workflow
+
+- Read `+"`gokub.init`"+`, `+"`.gokub.yaml`"+`, and the relevant skill under `+"`.agents/skills`"+` before changing code.
+- Preserve the repository's existing architecture and conventions.
+- Use `+"`gokub add <feature>`"+` or GOKUB MCP tools for supported scaffolds, then integrate generated code with existing application wiring.
+- Keep `+"`.gokub.yaml`"+` in sync with enabled capabilities.
+- Run the repository's tests, `+"`go vet ./...`"+`, and `+"`gokub doctor`"+` before delivery.
+- Never edit secrets or commit `+"`.env`"+` files.
+
+`, m.Name, m.Module, m.Framework, m.Database, m.Messaging)
+	}
 	return fmt.Sprintf(`# AGENTS.md
 
 You are working in a GOKUB-generated Go service.
@@ -341,6 +401,19 @@ gokub graph
 }
 
 func claudeFile(m manifest.Manifest) string {
+	if m.Template == "existing" {
+		return fmt.Sprintf(`# CLAUDE.md
+
+This existing Go project is initialized for GOKUB-assisted development.
+
+- Read `+"`gokub.init`"+`, `+"`.gokub.yaml`"+`, and the matching skill under `+"`.claude/skills`"+` before working.
+- Preserve the existing architecture and use GOKUB commands or MCP tools for supported project changes.
+- Integrate generated feature code with the repository's existing application wiring.
+- Verify changes with the repository's tests, `+"`go vet ./...`"+`, and `+"`gokub doctor`"+`.
+
+Project: %s
+`, m.Name)
+	}
 	return fmt.Sprintf(`# CLAUDE.md
 
 This repository is a GOKUB-generated Go service.
