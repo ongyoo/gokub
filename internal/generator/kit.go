@@ -73,6 +73,14 @@ func dbDriverImport(database string) string {
 	return `"gorm.io/gorm"`
 }
 
+// dbOpenArgs is the argument expression passed to db.Open in the service main.
+func dbOpenArgs(database string) string {
+	if database == "mongodb" {
+		return "cfg.DatabaseDSN(), cfg.DatabaseName()"
+	}
+	return "cfg.DatabaseDSN()"
+}
+
 // pingDatabaseSource is the readiness ping helper for the chosen database.
 func pingDatabaseSource(database string) string {
 	if database == "mongodb" {
@@ -162,7 +170,7 @@ func newKitProject(root string, m manifest.Manifest) error {
 		"cmd/" + service + "/main.go":                      kitMainFile(m.Module, m.Framework, domain, database),
 		"tests/README.md":                                  "# Tests\n\nIntegration and acceptance tests live here. Unit tests sit next to the code they cover under `internal/`.\n",
 		"README.md":                                        kitReadmeFile(m, service, domain),
-		"Makefile":                                         kitMakefile(service),
+		"Makefile":                                         kitMakefile(service, database),
 		"Dockerfile":                                       kitDockerfile(service, m.GoVersion),
 		"docker-compose.yml":                               kitComposeFile(m.Name, database),
 		".env.example":                                     kitEnvFile(m.Name, m.Messaging, "", database),
@@ -256,13 +264,14 @@ func agentFilesFor(m manifest.Manifest) map[string]string {
 }
 
 func kitConfigFile(database string) string {
-	databaseDefault := "postgres://app:app@localhost:5432/app?sslmode=disable"
 	if database == "mongodb" {
-		databaseDefault = "mongodb://localhost:27017"
+		return kitMongoConfigFile()
 	}
-	return fmt.Sprintf(`package config
+	return `package config
 
 import (
+	"fmt"
+
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
@@ -270,10 +279,27 @@ import (
 
 // Config holds runtime configuration loaded from the environment.
 type Config struct {
-	AppEnv      string `+tick+`envconfig:"APP_ENV" default:"local"`+tick+`
-	Port        string `+tick+`envconfig:"PORT" default:"8080"`+tick+`
-	LogLevel    string `+tick+`envconfig:"LOG_LEVEL" default:"debug"`+tick+`
-	DatabaseURL string `+tick+`envconfig:"DATABASE_URL" default:"%s"`+tick+`
+	AppEnv   string ` + tick + `envconfig:"APP_ENV" default:"local"` + tick + `
+	Port     string ` + tick + `envconfig:"PORT" default:"8080"` + tick + `
+	LogLevel string ` + tick + `envconfig:"LOG_LEVEL" default:"debug"` + tick + `
+
+	// Set DATABASE_URL to override, or configure the DB_* pieces below.
+	DatabaseURL string ` + tick + `envconfig:"DATABASE_URL"` + tick + `
+	DBHost      string ` + tick + `envconfig:"DB_HOST" default:"localhost"` + tick + `
+	DBPort      string ` + tick + `envconfig:"DB_PORT" default:"5432"` + tick + `
+	DBUser      string ` + tick + `envconfig:"DB_USER" default:"app"` + tick + `
+	DBPassword  string ` + tick + `envconfig:"DB_PASSWORD" default:"app"` + tick + `
+	DBName      string ` + tick + `envconfig:"DB_NAME" default:"app"` + tick + `
+	DBSSLMode   string ` + tick + `envconfig:"DB_SSLMODE" default:"disable"` + tick + `
+}
+
+// DatabaseDSN returns DATABASE_URL when set, otherwise a DSN assembled from the
+// individual DB_* variables so each piece can be configured separately.
+func (c Config) DatabaseDSN() string {
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName, c.DBSSLMode)
 }
 
 // Load reads configuration from a local .env file (when present) and the
@@ -284,14 +310,74 @@ func Load() Config {
 	_ = godotenv.Load()
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {
-		logrus.Fatalf("load config: %%v", err)
+		logrus.Fatalf("load config: %v", err)
 	}
 	if level, err := logrus.ParseLevel(cfg.LogLevel); err == nil {
 		logrus.SetLevel(level)
 	}
 	return cfg
 }
-`, databaseDefault)
+`
+}
+
+func kitMongoConfigFile() string {
+	return `package config
+
+import (
+	"fmt"
+
+	"github.com/joho/godotenv"
+	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
+)
+
+// Config holds runtime configuration loaded from the environment.
+type Config struct {
+	AppEnv   string ` + tick + `envconfig:"APP_ENV" default:"local"` + tick + `
+	Port     string ` + tick + `envconfig:"PORT" default:"8080"` + tick + `
+	LogLevel string ` + tick + `envconfig:"LOG_LEVEL" default:"debug"` + tick + `
+
+	// Set DATABASE_URL to override, or configure the DB_* pieces below.
+	DatabaseURL string ` + tick + `envconfig:"DATABASE_URL"` + tick + `
+	DBHost      string ` + tick + `envconfig:"DB_HOST" default:"localhost"` + tick + `
+	DBPort      string ` + tick + `envconfig:"DB_PORT" default:"27017"` + tick + `
+	DBUser      string ` + tick + `envconfig:"DB_USER"` + tick + `
+	DBPassword  string ` + tick + `envconfig:"DB_PASSWORD"` + tick + `
+	DBName      string ` + tick + `envconfig:"DB_NAME" default:"app"` + tick + `
+}
+
+// DatabaseDSN returns DATABASE_URL when set, otherwise a URI assembled from the
+// individual DB_* variables so each piece can be configured separately.
+func (c Config) DatabaseDSN() string {
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+	auth := ""
+	if c.DBUser != "" {
+		auth = fmt.Sprintf("%s:%s@", c.DBUser, c.DBPassword)
+	}
+	return fmt.Sprintf("mongodb://%s%s:%s", auth, c.DBHost, c.DBPort)
+}
+
+// DatabaseName returns the MongoDB database to use.
+func (c Config) DatabaseName() string { return c.DBName }
+
+// Load reads configuration from a local .env file (when present) and the
+// environment, then configures logging.
+func Load() Config {
+	// Best-effort: load .env for local development. Real environment variables
+	// always take precedence and a missing file is not an error.
+	_ = godotenv.Load()
+	var cfg Config
+	if err := envconfig.Process("", &cfg); err != nil {
+		logrus.Fatalf("load config: %v", err)
+	}
+	if level, err := logrus.ParseLevel(cfg.LogLevel); err == nil {
+		logrus.SetLevel(level)
+	}
+	return cfg
+}
+`
 }
 
 func kitAppFile(service string) string {
@@ -1015,16 +1101,14 @@ func kitDatabaseFile(database string) string {
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Open connects to MongoDB and returns the application database. The database
-// name is taken from DATABASE_NAME (default "app").
-func Open(uri string) (*mongo.Database, error) {
+// Open connects to MongoDB and returns the named application database.
+func Open(uri, name string) (*mongo.Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
@@ -1033,10 +1117,6 @@ func Open(uri string) (*mongo.Database, error) {
 	}
 	if err := client.Ping(ctx, nil); err != nil {
 		return nil, err
-	}
-	name := os.Getenv("DATABASE_NAME")
-	if name == "" {
-		name = "app"
 	}
 	return client.Database(name), nil
 }
@@ -1271,13 +1351,33 @@ func Atoi(s string, fallback int) int {
 `
 }
 
-func kitMakefile(service string) string {
+func kitMakefile(service, database string) string {
+	dbService := "postgres"
+	if database == "mongodb" {
+		dbService = "mongo"
+	}
 	return fmt.Sprintf(`SCORE_MIN ?= 80
 
-.PHONY: run test build fmt vet lint tidy doctor score graph graph-check
+.PHONY: run dev up down logs test build fmt vet lint tidy doctor score graph graph-check
 
 run:
-	go run ./cmd/%s
+	go run ./cmd/%[1]s
+
+## dev: start the database, then run the service locally
+dev: up
+	go run ./cmd/%[1]s
+
+## up: start dependencies (database) in the background
+up:
+	docker compose up -d %[2]s
+
+## down: stop and remove containers
+down:
+	docker compose down
+
+## logs: follow container logs
+logs:
+	docker compose logs -f
 
 test:
 	go test -race -cover ./...
@@ -1308,7 +1408,7 @@ graph:
 
 graph-check:
 	gokub graph --check
-`, service)
+`, service, dbService)
 }
 
 func kitDockerfile(service, goVersion string) string {
@@ -1378,21 +1478,33 @@ func kitEnvFile(name, messaging, encryptionKey, database string) string {
 	if encryptionKey == "" {
 		encryptionKey = "replace-with-a-base64-encoded-32-byte-key"
 	}
-	databaseURL := "postgres://app:app@localhost:5432/app?sslmode=disable"
+	databaseBlock := `# Database — set each piece, or a full DATABASE_URL to override them.
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=app
+DB_PASSWORD=app
+DB_NAME=app
+DB_SSLMODE=disable
+# DATABASE_URL=postgres://app:app@localhost:5432/app?sslmode=disable
+`
 	if database == "mongodb" {
-		databaseURL = "mongodb://localhost:27017"
+		databaseBlock = `# Database — set each piece, or a full DATABASE_URL to override them.
+DB_HOST=localhost
+DB_PORT=27017
+DB_NAME=app
+# DB_USER=
+# DB_PASSWORD=
+# DATABASE_URL=mongodb://localhost:27017
+`
 	}
 	base := fmt.Sprintf(`# %s
 APP_ENV=local
 PORT=8080
 LOG_LEVEL=debug
-DATABASE_URL=%s
 APP_ENCRYPTION_KEY=%s
 CORS_ALLOW_ORIGIN=*
-`, name, databaseURL, encryptionKey)
-	if database == "mongodb" {
-		base += "DATABASE_NAME=app\n"
-	}
+
+%s`, name, encryptionKey, databaseBlock)
 	switch messaging {
 	case "rabbitmq":
 		base += "RABBITMQ_URL=amqp://guest:guest@localhost:5672/\nRABBITMQ_EXCHANGE=events\n"

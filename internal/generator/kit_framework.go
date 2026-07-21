@@ -84,7 +84,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	database, err := db.Open(cfg.DatabaseURL)
+	database, err := db.Open(%[6]s)
 	if err != nil {
 		logrus.Fatalf("connect database: %%v", err)
 	}
@@ -116,7 +116,7 @@ func main() {
 }
 
 %[5]s
-`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database), dbOpenArgs(database))
 }
 
 func kitGinMain(module, domain, database string) string {
@@ -141,7 +141,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	database, err := db.Open(cfg.DatabaseURL)
+	database, err := db.Open(%[6]s)
 	if err != nil {
 		logrus.Fatalf("connect database: %%v", err)
 	}
@@ -174,7 +174,7 @@ func main() {
 }
 
 %[5]s
-`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database), dbOpenArgs(database))
 }
 
 func kitEchoMain(module, domain, database string) string {
@@ -199,7 +199,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	database, err := db.Open(cfg.DatabaseURL)
+	database, err := db.Open(%[6]s)
 	if err != nil {
 		logrus.Fatalf("connect database: %%v", err)
 	}
@@ -231,7 +231,7 @@ func main() {
 }
 
 %[5]s
-`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database))
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database), dbOpenArgs(database))
 }
 
 // ---------------------------------------------------------------------------
