@@ -159,11 +159,18 @@ func projectName(directory string) string {
 }
 
 func detectFramework(goMod string) string {
-	return match(goMod, "custom", map[string]string{
-		"github.com/gin-gonic/gin": "gin",
-		"github.com/gofiber/fiber": "fiber",
-		"github.com/labstack/echo": "echo",
-	})
+	switch {
+	case strings.Contains(goMod, "github.com/gin-gonic/gin"):
+		return "gin"
+	case strings.Contains(goMod, "github.com/gofiber/fiber/v2"):
+		return "fiber-v2"
+	case strings.Contains(goMod, "github.com/gofiber/fiber"):
+		return "fiber"
+	case strings.Contains(goMod, "github.com/labstack/echo"):
+		return "echo"
+	default:
+		return "custom"
+	}
 }
 
 func detectDatabase(goMod string) string {

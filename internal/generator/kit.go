@@ -37,7 +37,8 @@ func generateEncryptionKey() string {
 const tick = "`"
 
 // supportedFrameworks lists the HTTP frameworks the kit generator can emit.
-var supportedFrameworks = []string{"gin", "fiber", "echo"}
+// "fiber" targets Fiber v3; "fiber-v2" targets Fiber v2.
+var supportedFrameworks = []string{"gin", "fiber", "fiber-v2", "echo"}
 
 func normalizeFramework(framework string) string {
 	for _, candidate := range supportedFrameworks {

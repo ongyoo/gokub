@@ -8,6 +8,8 @@ func kitMainFile(module, framework, domain, database string) string {
 	switch framework {
 	case "fiber":
 		return kitFiberMain(module, domain, database)
+	case "fiber-v2":
+		return kitFiberV2Main(module, domain, database)
 	case "echo":
 		return kitEchoMain(module, domain, database)
 	default:
@@ -19,6 +21,8 @@ func kitHTTPServerFile(framework string) string {
 	switch framework {
 	case "fiber":
 		return kitFiberServer()
+	case "fiber-v2":
+		return kitFiberV2Server()
 	case "echo":
 		return kitEchoServer()
 	default:
@@ -30,6 +34,8 @@ func kitMiddlewareFile(framework string) string {
 	switch framework {
 	case "fiber":
 		return kitFiberMiddleware()
+	case "fiber-v2":
+		return kitFiberV2Middleware()
 	case "echo":
 		return kitEchoMiddleware()
 	default:
@@ -41,6 +47,8 @@ func kitHandlerFile(module, framework, domain, typeName string) string {
 	switch framework {
 	case "fiber":
 		return kitFiberHandler(module, domain, typeName)
+	case "fiber-v2":
+		return kitFiberV2Handler(module, domain, typeName)
 	case "echo":
 		return kitEchoHandler(module, domain, typeName)
 	default:
@@ -52,6 +60,8 @@ func kitRouterFile(framework, domain string) string {
 	switch framework {
 	case "fiber":
 		return kitFiberRouter(domain)
+	case "fiber-v2":
+		return kitFiberV2Router(domain)
 	case "echo":
 		return kitEchoRouter(domain)
 	default:
@@ -1154,6 +1164,355 @@ func SetRoutes(group *echo.Group, h Handler, middlewares ...echo.MiddlewareFunc)
 	group.GET("/:id", h.Get)
 	group.PATCH("/:id", h.Update)
 	group.DELETE("/:id", h.Delete)
+}
+`, domain)
+}
+
+// ---------------------------------------------------------------------------
+// Fiber v2 variants
+// ---------------------------------------------------------------------------
+
+func kitFiberV2Main(module, domain, database string) string {
+	return fmt.Sprintf(`package main
+
+import (
+	"context"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
+	%[3]s
+
+	"%[1]s/config"
+	"%[1]s/internal/app/events"
+	"%[1]s/internal/%[2]s"
+	db "%[1]s/pkg/database/%[4]s"
+	httpserver "%[1]s/pkg/httpserver/fiber-v2"
+	middleware "%[1]s/pkg/middleware/fiber-v2"
+)
+
+func main() {
+	cfg := config.Load()
+
+	database, err := db.Open(%[6]s)
+	if err != nil {
+		logrus.Fatalf("connect database: %%v", err)
+	}
+
+	repo := %[2]s.NewRepository(database)
+	service := %[2]s.NewService(repo, events.NewPublisherFromEnvOrNoop())
+	if err := service.AutoMigrate(context.Background()); err != nil {
+		logrus.Fatalf("migrate: %%v", err)
+	}
+	handler := %[2]s.NewHandler(service)
+
+	server := httpserver.NewServer(cfg.Port)
+	server.App.Use(middleware.Recover(), middleware.RequestID(), middleware.SecureHeaders(), middleware.CORS(), middleware.RequestLogger())
+	server.App.Get("/health/live", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"status": "ok"}) })
+	server.App.Get("/health/ready", func(c *fiber.Ctx) error {
+		if err := pingDatabase(database); err != nil {
+			logrus.Warnf("readiness check failed: %%v", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "unavailable"})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
+	api := server.App.Group("/api")
+	%[2]s.SetRoutes(api.Group("/%[2]ss"), handler)
+
+	if err := server.Run(); err != nil {
+		logrus.Fatalf("server: %%v", err)
+	}
+}
+
+%[5]s
+`, module, domain, dbDriverImport(database), databaseDir(database), pingDatabaseSource(database), dbOpenArgs(database))
+}
+
+func kitFiberV2Server() string {
+	return `package httpserver
+
+import (
+	"context"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
+)
+
+// Server wraps a Fiber v2 application with graceful shutdown.
+type Server struct {
+	App  *fiber.App
+	Addr string
+}
+
+// NewServer creates a Fiber server bound to the given port.
+func NewServer(port string) *Server {
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	})
+	return &Server{App: app, Addr: ":" + port}
+}
+
+// Run starts the server and blocks until SIGINT or SIGTERM, then shuts down.
+func (s *Server) Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		logrus.Infof("http server listening on %s", s.Addr)
+		if err := s.App.Listen(s.Addr); err != nil {
+			logrus.Errorf("listen: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	logrus.Info("shutting down http server")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return s.App.ShutdownWithContext(shutdownCtx)
+}
+`
+}
+
+func kitFiberV2Middleware() string {
+	return `package middleware
+
+import (
+	"os"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+)
+
+// RequestLogger logs one structured line per request.
+func RequestLogger() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		start := time.Now()
+		err := c.Next()
+		logrus.WithFields(logrus.Fields{
+			"method":      c.Method(),
+			"path":        c.Path(),
+			"status":      c.Response().StatusCode(),
+			"duration_ms": time.Since(start).Milliseconds(),
+		}).Info("http request")
+		return err
+	}
+}
+
+// Recover converts panics into 500 responses.
+func Recover() fiber.Handler {
+	return func(c *fiber.Ctx) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("panic recovered: %v", r)
+				err = c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "internal server error"})
+			}
+		}()
+		return c.Next()
+	}
+}
+
+// SecureHeaders sets conservative security response headers.
+func SecureHeaders() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("Referrer-Policy", "no-referrer")
+		return c.Next()
+	}
+}
+
+// RequestID ensures every request carries an X-Request-ID for tracing.
+func RequestID() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Get("X-Request-ID")
+		if id == "" {
+			id = uuid.NewString()
+		}
+		c.Set("X-Request-ID", id)
+		c.Locals("request_id", id)
+		return c.Next()
+	}
+}
+
+// CORS applies cross-origin headers and answers preflight requests. Set
+// CORS_ALLOW_ORIGIN to restrict the allowed origin (defaults to *).
+func CORS() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Origin", corsOrigin())
+		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Request-ID")
+		if c.Method() == fiber.MethodOptions {
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+		return c.Next()
+	}
+}
+
+func corsOrigin() string {
+	if origin := os.Getenv("CORS_ALLOW_ORIGIN"); origin != "" {
+		return origin
+	}
+	return "*"
+}
+`
+}
+
+func kitFiberV2Handler(module, domain, typeName string) string {
+	return fmt.Sprintf(`package %[2]s
+
+import (
+	"net/http"
+
+	"github.com/gofiber/fiber/v2"
+
+	"%[1]s/pkg/api"
+	"%[1]s/pkg/utils"
+	"%[1]s/pkg/validator"
+)
+
+// Handler exposes the %[3]s HTTP endpoints.
+type Handler struct {
+	service Service
+}
+
+// NewHandler builds a Handler over the %[3]s service.
+func NewHandler(service Service) Handler {
+	return Handler{service: service}
+}
+
+// List godoc
+// @Summary  List %[3]s records
+// @Tags     %[2]s
+// @Produce  json
+// @Success  200  {object}  api.PaginatedContent[[]%[3]s]
+// @Router   /%[2]ss [get]
+func (h Handler) List(c *fiber.Ctx) error {
+	page := utils.Atoi(c.Query("page"), 1)
+	pageSize := utils.Atoi(c.Query("pageSize"), 20)
+	items, total, err := h.service.List(c.Context(), Query{Page: page, PageSize: pageSize, Search: c.Query("search")})
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(api.PaginatedContent[[]%[3]s]{
+		APIResponse: api.APIResponse[[]%[3]s]{Success: true, Result: items},
+		Total:       total,
+		Page:        int64(page),
+		PerPage:     int64(pageSize),
+		TotalPage:   totalPages(total, pageSize),
+	})
+}
+
+// Create godoc
+// @Summary  Create a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    body  body  %[4]s  true  "payload"
+// @Success  201  {object}  api.APIResponse[%[3]s]
+// @Failure  400  {object}  api.APIError
+// @Router   /%[2]ss [post]
+func (h Handler) Create(c *fiber.Ctx) error {
+	var req %[4]s
+	if err := c.BodyParser(&req); err != nil {
+		return fail(c, http.StatusBadRequest, err.Error())
+	}
+	if err := validator.Struct(req); err != nil {
+		return fail(c, http.StatusBadRequest, err.Error())
+	}
+	item := %[3]s{Name: req.Name, Price: req.Price}
+	if err := h.service.Create(c.Context(), &item); err != nil {
+		return fail(c, http.StatusInternalServerError, err.Error())
+	}
+	return c.Status(http.StatusCreated).JSON(api.APIResponse[%[3]s]{Success: true, Result: item})
+}
+
+// Get godoc
+// @Summary  Get a %[3]s by id
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Failure  404  {object}  api.APIError
+// @Router   /%[2]ss/{id} [get]
+func (h Handler) Get(c *fiber.Ctx) error {
+	item, err := h.service.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return fail(c, http.StatusNotFound, err.Error())
+	}
+	return c.JSON(api.APIResponse[%[3]s]{Success: true, Result: *item})
+}
+
+// Update godoc
+// @Summary  Update a %[3]s
+// @Tags     %[2]s
+// @Accept   json
+// @Produce  json
+// @Param    id    path  string          true  "identifier"
+// @Param    body  body  map[string]any  true  "fields to update"
+// @Success  200  {object}  api.APIResponse[%[3]s]
+// @Router   /%[2]ss/{id} [patch]
+func (h Handler) Update(c *fiber.Ctx) error {
+	var updates map[string]any
+	if err := c.BodyParser(&updates); err != nil {
+		return fail(c, http.StatusBadRequest, err.Error())
+	}
+	item, err := h.service.Update(c.Context(), c.Params("id"), updates)
+	if err != nil {
+		return fail(c, http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(api.APIResponse[%[3]s]{Success: true, Result: *item})
+}
+
+// Delete godoc
+// @Summary  Delete a %[3]s
+// @Tags     %[2]s
+// @Produce  json
+// @Param    id   path  string  true  "identifier"
+// @Success  200  {object}  api.APIMessage
+// @Router   /%[2]ss/{id} [delete]
+func (h Handler) Delete(c *fiber.Ctx) error {
+	if err := h.service.Delete(c.Context(), c.Params("id")); err != nil {
+		return fail(c, http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(api.APIMessage{Success: true, Message: "deleted"})
+}
+
+func fail(c *fiber.Ctx, status int, message string) error {
+	return c.Status(status).JSON(api.APIError{ErrorCode: http.StatusText(status), Message: message})
+}
+
+func totalPages(total int64, pageSize int) int64 {
+	if pageSize <= 0 {
+		return 0
+	}
+	return (total + int64(pageSize) - 1) / int64(pageSize)
+}
+`, module, domain, typeName, requestTypeName(typeName))
+}
+
+func kitFiberV2Router(domain string) string {
+	return fmt.Sprintf(`package %s
+
+import "github.com/gofiber/fiber/v2"
+
+// SetRoutes attaches the resource endpoints to the router group, applying any
+// group-scoped middleware passed by the caller.
+func SetRoutes(router fiber.Router, h Handler, middlewares ...fiber.Handler) {
+	for _, m := range middlewares {
+		router.Use(m)
+	}
+	router.Get("/", h.List)
+	router.Post("/", h.Create)
+	router.Get("/:id", h.Get)
+	router.Patch("/:id", h.Update)
+	router.Delete("/:id", h.Delete)
 }
 `, domain)
 }

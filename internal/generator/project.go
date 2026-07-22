@@ -163,11 +163,23 @@ func addCRUD(root, name string) error {
 	}
 	framework := m.Framework
 	if !containsString(supportedFrameworks, framework) {
-		return fmt.Errorf("CRUD generation requires gin, fiber, or echo; run `gokub init --framework <name>` to set the existing project's framework")
+		return fmt.Errorf("CRUD generation requires gin, fiber, fiber-v2, or echo; run `gokub init --framework <name>` to set the existing project's framework")
 	}
 	database := normalizeDatabase(m.Database)
 	pkg := featureName(name)
 	typeName := exported(name)
+
+	// Ensure the shared packages the generated domain depends on exist. writeNew
+	// skips files already present, so adopted projects get them once and kit
+	// projects are left untouched.
+	shared := map[string]string{
+		filepath.Join(root, "pkg", "api", "response.go"):                 kitAPIResponseFile(),
+		filepath.Join(root, "pkg", "utils", "utils.go"):                  kitUtilsFile(),
+		filepath.Join(root, "pkg", "validator", "validator.go"):          kitValidatorFile(),
+		filepath.Join(root, "internal", "app", "events", "publisher.go"): kitEventsPublisherFile(),
+		filepath.Join(root, "internal", "app", "events", "contracts.go"): kitEventsContractsFile(),
+	}
+
 	dir := filepath.Join(root, "internal", pkg)
 	files := map[string]string{
 		filepath.Join(dir, "model.go"):        kitModelFile(pkg, typeName, database),
@@ -176,6 +188,11 @@ func addCRUD(root, name string) error {
 		filepath.Join(dir, "service_test.go"): kitServiceTestFile(pkg, typeName),
 		filepath.Join(dir, "handler.go"):      kitHandlerFile(m.Module, framework, pkg, typeName),
 		filepath.Join(dir, "router.go"):       kitRouterFile(framework, pkg),
+	}
+	for path, content := range shared {
+		if err := writeNew(path, content); err != nil {
+			return err
+		}
 	}
 	for path, content := range files {
 		if err := writeNew(path, content); err != nil {

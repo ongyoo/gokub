@@ -764,7 +764,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 		}
 	}
 	if wizard && !setFlags["framework"] {
-		*framework = prompts.choice("Framework", []string{"gin", "fiber", "echo"}, *framework)
+		*framework = prompts.choice("Framework", []string{"gin", "fiber", "fiber-v2", "echo"}, *framework)
 	}
 	if wizard && !setFlags["database"] {
 		*database = prompts.choice("Database", []string{"postgres", "pgx", "mongodb", "none"}, *database)
@@ -874,7 +874,7 @@ func validateProjectOptions(m manifest.Manifest) error {
 	}
 	allowed := map[string][]string{
 		"style":        {"monolith", "microservices"},
-		"framework":    {"gin", "fiber", "echo"},
+		"framework":    {"gin", "fiber", "fiber-v2", "echo"},
 		"database":     {"postgres", "pgx", "mongodb", "none"},
 		"architecture": {"clean", "hexagonal", "layered"},
 		"messaging":    {"none", "kafka", "rabbitmq", "nats"},
