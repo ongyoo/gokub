@@ -167,12 +167,16 @@ func detectFramework(goMod string) string {
 }
 
 func detectDatabase(goMod string) string {
-	return match(goMod, "none", map[string]string{
-		"go.mongodb.org/mongo-driver": "mongodb",
-		"gorm.io/driver/postgres":     "postgres",
-		"github.com/jackc/pgx":        "postgres",
-		"github.com/lib/pq":           "postgres",
-	})
+	switch {
+	case strings.Contains(goMod, "gorm.io/"):
+		return "postgres"
+	case strings.Contains(goMod, "github.com/jackc/pgx"), strings.Contains(goMod, "github.com/lib/pq"):
+		return "pgx"
+	case strings.Contains(goMod, "go.mongodb.org/mongo-driver"):
+		return "mongodb"
+	default:
+		return "none"
+	}
 }
 
 func detectMessaging(goMod string) string {

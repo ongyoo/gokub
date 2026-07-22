@@ -767,7 +767,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 		*framework = prompts.choice("Framework", []string{"gin", "fiber", "echo"}, *framework)
 	}
 	if wizard && !setFlags["database"] {
-		*database = prompts.choice("Database", []string{"postgres", "mongodb", "none"}, *database)
+		*database = prompts.choice("Database", []string{"postgres", "pgx", "mongodb", "none"}, *database)
 	}
 	if wizard && !setFlags["messaging"] {
 		*messaging = prompts.choice("Messaging", []string{"none", "kafka", "rabbitmq", "nats"}, *messaging)
@@ -863,7 +863,7 @@ func runNew(args []string, in io.Reader, out io.Writer) error {
 
 func standardTemplateFeature(feature string) bool {
 	return contains([]string{
-		"auth", "redis", "postgres", "mongodb", "kafka", "rabbitmq", "nats",
+		"auth", "redis", "postgres", "pgx", "mongodb", "kafka", "rabbitmq", "nats",
 		"otel", "docker", "github-actions",
 	}, feature)
 }
@@ -875,7 +875,7 @@ func validateProjectOptions(m manifest.Manifest) error {
 	allowed := map[string][]string{
 		"style":        {"monolith", "microservices"},
 		"framework":    {"gin", "fiber", "echo"},
-		"database":     {"postgres", "mongodb", "none"},
+		"database":     {"postgres", "pgx", "mongodb", "none"},
 		"architecture": {"clean", "hexagonal", "layered"},
 		"messaging":    {"none", "kafka", "rabbitmq", "nats"},
 		"agents":       {"all", "codex", "claude", "copilot", "gemini", "none"},

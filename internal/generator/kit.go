@@ -48,29 +48,41 @@ func normalizeFramework(framework string) string {
 	return "gin"
 }
 
-// normalizeDatabase reduces the manifest database to a data-layer choice. Only
-// mongodb changes the generated persistence; everything else uses gorm/postgres.
+// normalizeDatabase reduces the manifest database to a data-layer choice:
+// mongodb (mongo driver), pgx (pgx pool + SQL), or postgres (gorm).
 func normalizeDatabase(database string) string {
-	if database == "mongodb" {
+	switch database {
+	case "mongodb":
 		return "mongodb"
+	case "pgx":
+		return "pgx"
+	default:
+		return "postgres"
 	}
-	return "postgres"
 }
 
 // databaseDir is the pkg/database subdirectory for a database.
 func databaseDir(database string) string {
-	if database == "mongodb" {
+	switch database {
+	case "mongodb":
 		return "mongodb"
+	case "pgx":
+		return "postgres"
+	default:
+		return "postgresql"
 	}
-	return "postgresql"
 }
 
 // dbDriverImport is the driver import line used by the service main.
 func dbDriverImport(database string) string {
-	if database == "mongodb" {
+	switch database {
+	case "mongodb":
 		return `"go.mongodb.org/mongo-driver/mongo"`
+	case "pgx":
+		return `"github.com/jackc/pgx/v5/pgxpool"`
+	default:
+		return `"gorm.io/gorm"`
 	}
-	return `"gorm.io/gorm"`
 }
 
 // dbOpenArgs is the argument expression passed to db.Open in the service main.
@@ -83,18 +95,24 @@ func dbOpenArgs(database string) string {
 
 // pingDatabaseSource is the readiness ping helper for the chosen database.
 func pingDatabaseSource(database string) string {
-	if database == "mongodb" {
+	switch database {
+	case "mongodb":
 		return `func pingDatabase(database *mongo.Database) error {
 	return database.Client().Ping(context.Background(), nil)
 }`
-	}
-	return `func pingDatabase(database *gorm.DB) error {
+	case "pgx":
+		return `func pingDatabase(database *pgxpool.Pool) error {
+	return database.Ping(context.Background())
+}`
+	default:
+		return `func pingDatabase(database *gorm.DB) error {
 	sqlDB, err := database.DB()
 	if err != nil {
 		return err
 	}
 	return sqlDB.Ping()
 }`
+	}
 }
 
 // serviceName returns the cmd entrypoint directory for the project, matching the
@@ -675,6 +693,10 @@ func kitModelFile(pkg, typeName, database string) string {
 	priceTag := "json:\"price\""
 	createdTag := "json:\"createdAt\""
 	updatedTag := "json:\"updatedAt\""
+	if database == "pgx" {
+		idTag = "json:\"id\""
+		nameTag = "json:\"name\""
+	}
 	if database == "mongodb" {
 		idTag = "json:\"id\" bson:\"_id,omitempty\""
 		nameTag = "json:\"name\" bson:\"name\""
@@ -713,6 +735,9 @@ type %[3]s struct {
 func kitRepositoryFile(pkg, typeName, database string) string {
 	if database == "mongodb" {
 		return kitMongoRepositoryFile(pkg, typeName)
+	}
+	if database == "pgx" {
+		return kitPgxRepositoryFile(pkg, typeName)
 	}
 	return fmt.Sprintf(`package %[1]s
 
@@ -868,6 +893,105 @@ func (r *repository) Update(ctx context.Context, id string, updates map[string]a
 
 func (r *repository) Delete(ctx context.Context, id string) error {
 	_, err := r.col.DeleteOne(ctx, bson.M{"_id": id})
+	return err
+}
+`, pkg, typeName)
+}
+
+func kitPgxRepositoryFile(pkg, typeName string) string {
+	return fmt.Sprintf(`package %[1]s
+
+import (
+	"context"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Repository is the persistence port for %[2]s entities.
+type Repository interface {
+	AutoMigrate(ctx context.Context) error
+	List(ctx context.Context, q Query) ([]%[2]s, int64, error)
+	Create(ctx context.Context, item *%[2]s) error
+	Get(ctx context.Context, id string) (*%[2]s, error)
+	Update(ctx context.Context, id string, updates map[string]any) (*%[2]s, error)
+	Delete(ctx context.Context, id string) error
+}
+
+type repository struct {
+	pool *pgxpool.Pool
+}
+
+// NewRepository returns a pgx-backed Repository.
+func NewRepository(pool *pgxpool.Pool) Repository {
+	return &repository{pool: pool}
+}
+
+// AutoMigrate creates the table if it does not exist.
+func (r *repository) AutoMigrate(ctx context.Context) error {
+	_, err := r.pool.Exec(ctx, "CREATE TABLE IF NOT EXISTS %[1]ss (id TEXT PRIMARY KEY, name TEXT NOT NULL, price DOUBLE PRECISION, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ)")
+	return err
+}
+
+func (r *repository) List(ctx context.Context, q Query) ([]%[2]s, int64, error) {
+	pattern := "%%"
+	if q.Search != "" {
+		pattern = "%%" + q.Search + "%%"
+	}
+	var total int64
+	if err := r.pool.QueryRow(ctx, "SELECT count(*) FROM %[1]ss WHERE name ILIKE $1", pattern).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.pool.Query(ctx, "SELECT id, name, price, created_at, updated_at FROM %[1]ss WHERE name ILIKE $1 ORDER BY created_at DESC OFFSET $2 LIMIT $3", pattern, (q.Page-1)*q.PageSize, q.PageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := []%[2]s{}
+	for rows.Next() {
+		var item %[2]s
+		if err := rows.Scan(&item.ID, &item.Name, &item.Price, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
+}
+
+func (r *repository) Create(ctx context.Context, item *%[2]s) error {
+	_, err := r.pool.Exec(ctx, "INSERT INTO %[1]ss (id, name, price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)", item.ID, item.Name, item.Price, item.CreatedAt, item.UpdatedAt)
+	return err
+}
+
+func (r *repository) Get(ctx context.Context, id string) (*%[2]s, error) {
+	var item %[2]s
+	err := r.pool.QueryRow(ctx, "SELECT id, name, price, created_at, updated_at FROM %[1]ss WHERE id = $1", id).Scan(&item.ID, &item.Name, &item.Price, &item.CreatedAt, &item.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *repository) Update(ctx context.Context, id string, updates map[string]any) (*%[2]s, error) {
+	item, err := r.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if v, ok := updates["name"].(string); ok {
+		item.Name = v
+	}
+	if v, ok := updates["price"].(float64); ok {
+		item.Price = v
+	}
+	item.UpdatedAt = time.Now().UTC()
+	if _, err := r.pool.Exec(ctx, "UPDATE %[1]ss SET name = $2, price = $3, updated_at = $4 WHERE id = $1", id, item.Name, item.Price, item.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+func (r *repository) Delete(ctx context.Context, id string) error {
+	_, err := r.pool.Exec(ctx, "DELETE FROM %[1]ss WHERE id = $1", id)
 	return err
 }
 `, pkg, typeName)
@@ -1119,6 +1243,21 @@ func Open(uri, name string) (*mongo.Database, error) {
 		return nil, err
 	}
 	return client.Database(name), nil
+}
+`
+	}
+	if database == "pgx" {
+		return `package postgres
+
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Open connects to PostgreSQL using a pgx connection pool.
+func Open(dsn string) (*pgxpool.Pool, error) {
+	return pgxpool.New(context.Background(), dsn)
 }
 `
 	}
