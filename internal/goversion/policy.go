@@ -66,9 +66,24 @@ func Description(version string) string {
 func ParseGoMod(content string) string {
 	for _, line := range strings.Split(content, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[0] == "go" && Validate(fields[1]) == nil {
-			return fields[1]
+		if len(fields) >= 2 && fields[0] == "go" {
+			// go.mod may pin a patch release (e.g. "go 1.25.7"); GOKUB tracks the
+			// major.minor line, so normalize before validating.
+			version := MajorMinor(fields[1])
+			if Validate(version) == nil {
+				return version
+			}
 		}
 	}
 	return ""
+}
+
+// MajorMinor reduces a Go version to its major.minor form, dropping any patch
+// component (1.25.7 -> 1.25).
+func MajorMinor(version string) string {
+	parts := strings.Split(version, ".")
+	if len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return version
 }

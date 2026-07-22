@@ -16,4 +16,7 @@ func TestPolicy(t *testing.T) {
 	if got := ParseGoMod("module example.com/api\n\ngo 1.25\n"); got != "1.25" {
 		t.Fatalf("ParseGoMod() = %q", got)
 	}
+	if got := ParseGoMod("module example.com/api\n\ngo 1.25.7\n"); got != "1.25" {
+		t.Fatalf("ParseGoMod(patch) = %q, want 1.25", got)
+	}
 }
