@@ -28,7 +28,7 @@ cmd/<name>-service/   entrypoint · graceful shutdown
 config/               environment configuration (envconfig · .env)
 internal/<domain>/    model · repository · service · handler · router
 internal/app/         composition · event bus (rabbitmq | kafka | nats)
-pkg/                  api · crypto · database (gorm) · error · httpserver
+pkg/                  api · crypto · database (gorm/mongo) · error · httpserver
                       middleware · utils · validator
 ```
 
@@ -37,7 +37,8 @@ pkg/                  api · crypto · database (gorm) · error · httpserver
 | | |
 |---|---|
 | 🧩 **Framework choice** | Generate for **Gin**, **Fiber**, or **Echo** — only the chosen one, no dead code |
-| 🗄️ **gorm + PostgreSQL** | Repository/service/handler/router per domain, ready to extend |
+| 🗄️ **PostgreSQL or MongoDB** | Pick your store — gorm+Postgres or the Mongo driver — per domain, ready to extend |
+| 🔧 **Config in pieces** | `DB_HOST` · `DB_PORT` · `DB_USER` · `DB_PASSWORD` · `DB_NAME` … assembled into a DSN, or override with `DATABASE_URL` |
 | ✅ **Validated requests** | `go-playground/validator` tags, rejected with 400 before your service runs |
 | 🔐 **Encryption built in** | AES-256-GCM helpers + a `Secret` column type that encrypts values at rest |
 | 📨 **Real messaging** | RabbitMQ / Kafka / NATS publishers, swappable with `enable` · `switch` · `disable` |
@@ -79,7 +80,7 @@ Project name      example-api
 Go module         github.com/example/example-api
 Go version        1.26 (recommended)
 Framework         gin | fiber | echo
-Database          postgres
+Database          postgres | mongodb
 Messaging         none
 Vibe coding       all        ← AI assistants: all | codex | claude | copilot | gemini | none
 Recipe            none
@@ -90,11 +91,11 @@ center. Run it:
 
 ```bash
 cd example-api
-docker compose up -d postgres
-make run        # or: go run ./cmd/example-api-service
+make dev        # starts the database (docker compose) and runs the service
 ```
 
 A ready-to-run, git-ignored `.env` (with a unique encryption key) is already there.
+`make up` / `make down` / `make logs` manage the database on their own.
 
 ## 🧱 What every project ships
 
@@ -102,9 +103,9 @@ A ready-to-run, git-ignored `.env` (with a unique encryption key) is already the
   (exported methods + swagger godoc), `router` (`SetRoutes` with group middleware)
 - **Server** — read/write/idle timeouts and signal-based graceful shutdown
 - **Middleware** — request-id, CORS, secure headers, panic recovery, structured logging (logrus)
-- **Config** — `envconfig` + `godotenv`, so `.env` just works locally
+- **Config** — `envconfig` + `godotenv`; database settings split into `DB_*` pieces with a `DATABASE_URL` override
 - **Security** — `pkg/crypto` (AES-256-GCM) and an encrypted `Secret` gorm column
-- **Ops** — Dockerfile, docker-compose, GitHub Actions CI, `.golangci.yml` + `make lint`
+- **Ops** — Dockerfile, docker-compose, GitHub Actions CI, `.golangci.yml`, and a Makefile with `make dev` / `up` / `down` / `logs` / `lint`
 - **DX** — VS Code & JetBrains run/debug configs, agent guidance, `.mcp.json`
 
 ## ⚡ Everyday workflows
