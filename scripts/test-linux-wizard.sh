@@ -23,13 +23,11 @@ trap 'rm -rf "$TEMP"' EXIT
 cd "$ROOT"
 go build -o "$TEMP/gokub" ./cmd/gokub
 
-# The Command Center loops until the user leaves. Outside a project the items are:
-# New project, Community templates, Plugins, Install shell completion, Update CLI,
-# Help (6th), Exit (7th). Select Help (5 downs), then from the redrawn menu select
-# Exit (6 downs) so the program terminates on its own.
-select_help=$'\033[B\033[B\033[B\033[B\033[B\r'
-select_exit=$'\033[B\033[B\033[B\033[B\033[B\033[B\r'
-printf '%s%s' "$select_help" "$select_exit" |
+# The Command Center loops until the user leaves. Number keys select a menu item
+# directly, which is robust to reordering: outside a project Help is item 7 and
+# Exit is item 8 (see commandCenterActions(false) in internal/cli). Pick Help to
+# render the command list, then Exit so the program terminates on its own.
+printf '78' |
   timeout 15s script -qec "cd '$TEMP' && '$TEMP/gokub'" /dev/null > "$TEMP/output.txt"
 
 grep -Fq 'Choose workflow' "$TEMP/output.txt"
